@@ -6,10 +6,10 @@ width, height = 810, 700                               # window size
 xcount = 20
 ycount = 20
 fontHs = 14
-fontHl = 17
+fontHl = 15
 fontWs = 14
-fontWl = 17
-lxspace = 15
+fontWl = 15
+lxspace = 11
 sxspace = 11
 prevlis = []
 lis = []
@@ -40,12 +40,13 @@ def reshape(w, h):
 	glMatrixMode(GL_MODELVIEW)
 
 def draw():                                            # ondraw is called all the time
-    global lis
+    global lis, courserlis
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) # clear the screen
     glLoadIdentity()                                   # reset position
     refresh2d(width, height)                           # set mode to 2d
     glColor3f(0.0, 0.0, 0.0)
     for i in lis:
         putpixel(i[0],i[1])
+
     glutSwapBuffers()                                  # important for double buffering
 
