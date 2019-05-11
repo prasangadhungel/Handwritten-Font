@@ -1,5 +1,7 @@
 from glfunctions import *
 from keyboard import *    
+for j in range(fontHl):
+    lis.append((xcount, ycount + j))
 glutInit()                                             # initialize glut
 glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_ALPHA | GLUT_DEPTH)
 glutInitWindowSize(width, height)                      # set window size
