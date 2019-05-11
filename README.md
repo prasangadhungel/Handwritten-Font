@@ -17,6 +17,4 @@ and start typing.
 Add your font images in the directory images/ and run the program.
 
 **Demo** <br />
-<figure class="video_container">
-  <iframe src="https://www.youtube.com/embed/enMumwvLAug" frameborder="0" allowfullscreen="true"> </iframe>
-</figure>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/d3TiCgGl-iQ" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
