@@ -1,0 +1,25 @@
+% 
+% Example of how to use a custom TTF font by following the directions here:
+% http://math.stanford.edu/~jyzhao/latexfonts.php 
+%
+% In this case, the custom font is LoKinderSchrift, from
+% http://www.fonts101.com/fonts/view/Uncategorized/22887/LoKinderSchrift
+%
+\documentclass{article}
+
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+
+\newcommand\customfont[1]{{\usefont{T1}{your_handwritten_font}{m}{n} #1 }}
+
+\title{Example: Custom Font}
+\author{writeLaTeX}
+
+\begin{document}
+\maketitle
+
+Normal Font Text.
+
+\Huge\customfont{Custom Font Text!}
+
+\end{document}
