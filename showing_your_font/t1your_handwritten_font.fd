@@ -1,4 +1,4 @@
-\ProvidesFile{t1custom.fd}
+\ProvidesFile{t1your_handwritten_font.fd}
 \DeclareFontFamily{T1}{your_handwritten_font}{}
 \DeclareFontShape{T1}{your_handwritten_font}{m}{n}{ <-> your_handwritten_font}{}
 \pdfmapline{+your_handwritten_font\space <your_handwritten_font.ttf\space <T1-WGL4.enc}
