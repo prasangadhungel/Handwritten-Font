@@ -70,7 +70,8 @@
 %loop through lines
 \newpage
 \hspace{-1.1em} % SHift top row left to prevent some section indentation
-\noindent\forloop{ct4}{1}{\value{ct4} < \missingcommand{nrOfLinesPerPage}}{
+\noindent\forloop{ct4}{0}{\value{ct4} < \missingcommand{nrOfLinesPerPage}}{
+
 % loop through columns
 \begin{tikzpicture}[scale=2][H]
     \tikzstyle{ann} = [draw=none,fill=none,right]
@@ -78,26 +79,26 @@
         %row sep=-\missingcommand{boxWidth}*0.09em,column
         row sep=-3pt,column sep=-\missingcommand{boxWidth}*0.0em] {
     % \hspace{-14em}   
-    % create square with symbol in it.
-    \forloop{ct1}{1}{\value{ct1} < \missingcommand{nrOfBoxesPerLine}}{
-    \node[rectangle,minimum height=\missingcommand{boxWidth}em,minimum width=\missingcommand{boxWidth}em] {.}; \pgfmatrixnextcell
-    }\\
-    
-    % \hspace{-14em}
-    % create empty square
-    \forloop{ct2}{1}{\value{ct2} < \missingcommand{nrOfBoxesPerLine}}{
-    \node[rectangle,minimum height=\missingcommand{boxWidth}em,minimum width=\missingcommand{boxWidth}em] {}; \pgfmatrixnextcell
-    }\\
-    
-    % \hspace{-14em}
-    % Create qr Codes
-    \forloop{ct3}{1}{\value{ct3} < \missingcommand{nrOfBoxesPerLineMinOne}}{
-    \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}em]{https://opensource.org/about} }; \pgfmatrixnextcell
-    }
-    
-    % \hspace{-14em}
-    % manually print last qr code to close without \pgfmatrixnextcell
-    \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}em]{https://opensource.org/about} };\\
+        % create square with symbol in it.
+        \forloop{ct1}{1}{\value{ct1} < \missingcommand{nrOfBoxesPerLine}}{
+        \node[rectangle,minimum height=\missingcommand{boxWidth}em,minimum width=\missingcommand{boxWidth}em] {.}; \pgfmatrixnextcell
+        }\\
+        
+        % \hspace{-14em}
+        % create empty square
+        \forloop{ct2}{1}{\value{ct2} < \missingcommand{nrOfBoxesPerLine}}{
+        \node[rectangle,minimum height=\missingcommand{boxWidth}em,minimum width=\missingcommand{boxWidth}em] {}; \pgfmatrixnextcell
+        }\\
+        
+        % \hspace{-14em}
+        % Create qr Codes
+        \forloop{ct3}{1}{\value{ct3} < \missingcommand{nrOfBoxesPerLineMinOne}}{
+        \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}em]{https://opensource.org/about} }; \pgfmatrixnextcell
+        }
+        
+        % \hspace{-14em}
+        % manually print last qr code to close without \pgfmatrixnextcell
+        \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}em]{https://opensource.org/about} };\\
     };
 \end{tikzpicture}
 } % close loop through lines
