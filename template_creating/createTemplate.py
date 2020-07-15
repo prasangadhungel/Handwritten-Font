@@ -1,3 +1,5 @@
+import math
+
 class CreateTemplate:
     
     # intializes object
@@ -15,6 +17,7 @@ class CreateTemplate:
         
         # specify page settings
         self.max_sheet_width = 210 # mm
+        self.max_horizontal_margin = 5 # mm (2.5 on each side)
         self.max_sheet_height = 297 # mm
         self.box_width = 20 #mm
         self.box_spacing = 3 #mm
@@ -86,9 +89,11 @@ class CreateTemplate:
     
     # returns the nr of boxes per line and nr of lines per page
     def optimise_box_distribution(self):
-        # TODO: Round down
-        nr_of_boxes_per_line = round(self.max_sheet_width/ (self.box_width+self.box_spacing),0)
-        # TODO: Round up (done by default)
+        
+        nr_of_boxes_per_line = math.floor((self.max_sheet_width-self.max_horizontal_margin+self.box_spacing)/ (self.box_width+self.box_spacing))
+        print(f'{self.max_sheet_width-self.max_horizontal_margin+self.box_spacing}div{self.box_width+self.box_spacing} = {(self.max_sheet_width-self.max_horizontal_margin+self.box_spacing)/ (self.box_width+self.box_spacing)} [boxes/row]')
+        
+        # TODO: implement vertical margin
         nr_of_lines = round(self.nrOfSymbols/nr_of_boxes_per_line)
         return [nr_of_boxes_per_line,nr_of_lines]
         

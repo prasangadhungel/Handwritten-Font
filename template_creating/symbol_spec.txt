@@ -1,7 +1,7 @@
 nrOfSymbols = 62
 boxWidth = 20
 boxHeight = 20
-nrOfBoxesPerLine = 9.0
-nrOfBoxesPerLineMinOne = 8.0
+nrOfBoxesPerLine = 9
+nrOfBoxesPerLineMinOne = 8
 nrOfLinesPerPage = 7
 nrOfLinesPerPageMinOne = 6
