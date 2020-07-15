@@ -5,11 +5,27 @@
 # conda install -c menpo opencv
 # 1. Similarly if the error is on the line "import numpy as np" then open anaconda and type:
 # conda install numpy
+
+# pip install pdf2image
+#conda install -c conda-forge poppler
 import cv2
 import numpy as np
 
+# first convert the pdf into separate images
+from pdf2image import convert_from_path
+pages = convert_from_path('filled.pdf', 500)
+count=0
+for page in pages:
+    page.save(f'out{count}.jpg', 'JPEG')
+    count = count+ 1
+
+# TODO: Scan the directory for a single pdf.
+# TODO: Loop per page
+# TODO: change the dimensions of the searched qr code based on the outputted specs in create template from symbol_spec.txt
+# TODO: Loop through all qr codes
+
 # Load imgae, grayscale, Gaussian blur, Otsu's threshold
-image = cv2.imread('scanned_template.jpg')
+image = cv2.imread('out0.jpg')
 original = image.copy()
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 blur = cv2.GaussianBlur(gray, (9,9), 0)
