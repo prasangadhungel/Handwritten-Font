@@ -84,7 +84,7 @@
         row sep=-3pt,column sep=-\missingcommand{boxWidth}*0.0mm] {
     % \hspace{-14em}   
         % create square with symbol in it.
-        \forloop{ct1}{1}{\value{ct1} < \missingcommand{nrOfBoxesPerLine}}{  
+        \forloop{ct1}{0}{\value{ct1} < \missingcommand{nrOfBoxesPerLine}}{  
         
         % increase the symbol count index by one
         \addtocounter{sym_index}{1}
@@ -95,13 +95,13 @@
         
         % \hspace{-14em}
         % create empty square
-        \forloop{ct2}{1}{\value{ct2} < \missingcommand{nrOfBoxesPerLine}}{
+        \forloop{ct2}{0}{\value{ct2} < \missingcommand{nrOfBoxesPerLine}}{
         \node[rectangle,minimum height=\missingcommand{boxWidth}mm,minimum width=\missingcommand{boxWidth}mm] {}; \pgfmatrixnextcell
         }\\
         
         % \hspace{-14em}
         % Create qr Codes
-        \forloop{ct3}{1}{\value{ct3} < \missingcommand{nrOfBoxesPerLineMinOne}}{
+        \forloop{ct3}{0}{\value{ct3} < \missingcommand{nrOfBoxesPerLineMinOne}}{
         \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}mm]{https://opensource.org/about} }; \pgfmatrixnextcell
         }
         
