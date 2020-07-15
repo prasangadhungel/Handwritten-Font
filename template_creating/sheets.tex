@@ -14,16 +14,16 @@
 }
 
 % TODO: verify whether all variable names contain an integer or float value that is non zero. Display error message indicating failing value otherswise.
-\begin{itemize}
-    \item This are the specifications of the qr dimensions and amount of qr images/symbols.
-    \item \missingcommand{nrOfSymbols}
-    \item \missingcommand{boxWidth}
-    \item \missingcommand{boxHeight}
-    \item nrOfBoxesPerLine= \missingcommand{nrOfBoxesPerLine}
-    \item nrOfBoxesPerLineMinOne = \missingcommand{nrOfBoxesPerLineMinOne}
-    \item nrOfLinesPerPage= \missingcommand{nrOfLinesPerPage}
-    \item \missingcommand{nrOfLinesPerPageMinOne}
-\end{itemize}
+% \begin{itemize}
+%     \item This are the specifications of the qr dimensions and amount of qr images/symbols.
+%     \item \missingcommand{nrOfSymbols}
+%     \item \missingcommand{boxWidth}
+%     \item \missingcommand{boxHeight}
+%     \item \missingcommand{nrOfBoxesPerLine}
+%     \item \missingcommand{nrOfBoxesPerLineMinOne}
+%     \item \missingcommand{nrOfLinesPerPage}
+%     \item \missingcommand{nrOfLinesPerPageMinOne}
+% \end{itemize}
 
 % read symbols
 
@@ -43,24 +43,14 @@
 }
 
 % TODO: verify whether all variable names contain an integer or float value that is non zero. Display error message indicating failing value otherswise.
-\begin{itemize}
-    \item These are the symbols that are read from file
-    \item \missingcommand{1}
-    \item \missingcommand{2}
-    \item \missingcommand{3}
-    \item \missingcommand{4}
-    \item \missingcommand{5}
-\end{itemize}
-
-
-% \newcounter{ct}
-% ...
-% \forloop{ct}{1}{\value{ct} < \missingcommand{nrOfBoxesPerLine}}%
-% {%
-%   \thect\
-  
-% }
-
+% \begin{itemize}
+%     \item These are the symbols that are read from file
+%     \item \missingcommand{1}
+%     \item \missingcommand{2}
+%     \item \missingcommand{3}
+%     \item \missingcommand{4}
+%     \item \missingcommand{5}
+% \end{itemize}
 % read symbols
 \newcounter{ct1}
 \newcounter{ct2}
@@ -72,8 +62,8 @@
 \setcounter{sym_index}{0}%
 
 %loop through lines
-\newpage
-\hspace{-1.1em} % SHift top row left to prevent some section indentation
+%\newpage
+\hspace{-1.7em} % SHift top row left to prevent some section indentation
 \noindent\forloop{ct4}{0}{\value{ct4} < \missingcommand{nrOfLinesPerPage}}{
 
 % loop through columns
