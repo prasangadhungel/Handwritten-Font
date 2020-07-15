@@ -106,16 +106,16 @@ class CreateTemplate:
         lines.append(f'boxHeight = {self.box_width}')
         lines.append(f'nrOfBoxesPerLine = {self.nr_of_boxes_per_line}')
         lines.append(f'nrOfBoxesPerLineMinOne = {self.nr_of_boxes_per_line-1}')
-        lines.append(f'nr_of_linesPerPage = {self.nr_of_lines}')
-        lines.append(f'nr_of_linesPerPageMinOne = {self.nr_of_lines-1}')
+        lines.append(f'nrOfLinesPerPage = {self.nr_of_lines}')
+        lines.append(f'nrOfLinesPerPageMinOne = {self.nr_of_lines-1}')
         return lines
         # nrOfSymbols = 30
         # boxWidth = 5.2
         # boxHeight = 7.2
         # nrOfBoxesPerLine = 10
         # nrOfBoxesPerLineMinOne = 9
-        # nr_of_linesPerPage = 6
-        # nr_of_linesPerPageMinOne = 5
+        # nrOfLinesPerPage = 6
+        # nrOfLinesPerPageMinOne = 5
     
     
     def set_box_dimensions(self):
@@ -126,8 +126,8 @@ class CreateTemplate:
     def set_box_distribution(self):
         self.nrOfBoxesPerLine = 10
         self.nrOfBoxesPerLineMinOne = 9
-        self.nr_of_linesPerPage = 6
-        self.nr_of_linesPerPageMinOne = 5
+        self.nrOfLinesPerPage = 6
+        self.nrOfLinesPerPageMinOne = 5
 
 if __name__ == '__main__':
     main = CreateTemplate()
