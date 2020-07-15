@@ -58,8 +58,8 @@
 \newcounter{ct4}
 
 % set a symbol counter
-\newcounter{sym_index}
-\setcounter{sym_index}{0}%
+\newcounter{symIndex}
+\setcounter{symIndex}{0}%
 
 %loop through lines
 %\newpage
@@ -77,10 +77,10 @@
         \forloop{ct1}{0}{\value{ct1} < \missingcommand{nrOfBoxesPerLine}}{  
         
         % increase the symbol count index by one
-        \addtocounter{sym_index}{1}
+        \addtocounter{symIndex}{1}
          
         \node[rectangle,minimum height=\missingcommand{boxWidth}mm,minimum width=\missingcommand{boxWidth}mm]
-        {.\missingcommand{\the\value{sym_index}}}; \pgfmatrixnextcell
+        {.\missingcommand{\the\value{symIndex}}}; \pgfmatrixnextcell
         }\\
         
         % \hspace{-14em}
@@ -92,12 +92,12 @@
         % \hspace{-14em}
         % Create qr Codes
         \forloop{ct3}{0}{\value{ct3} < \missingcommand{nrOfBoxesPerLineMinOne}}{
-        \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}mm]{https://opensource.org/about} }; \pgfmatrixnextcell
+        \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}mm]{\the\value{symIndex}} }; \pgfmatrixnextcell
         }
         
         % \hspace{-14em}
         % manually print last qr code to close without \pgfmatrixnextcell
-        \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}mm]{https://opensource.org/about} };\\
+        \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}mm]{\the\value{symIndex}} };\\
     };
 \end{tikzpicture}
 } % close loop through lines
