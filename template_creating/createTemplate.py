@@ -7,20 +7,17 @@ class CreateTemplate:
         # TODO: export encoding to import it with latex.
         # TODO: automatically select encoding based on user chosen language.
         
-        
         # Specify inout and output file locations and names
         source_dir = "./"
         ext = ".txt"
         self.symbols_file_name = "symbols"
         self.page_setting_filename = 'symbol_spec'
         
-        
         # specify page settings
-        self.max_sheet_width = 170 # mm
-        self.max_sheet_height = 280 # mm
+        self.max_sheet_width = 210 # mm
+        self.max_sheet_height = 297 # mm
         self.box_width = 20 #mm
         self.box_spacing = 3 #mm
-        
         
         # read the symbols from file
         self.symbol_lines = self.read_txt(source_dir,self.symbols_file_name,ext)
@@ -28,20 +25,18 @@ class CreateTemplate:
         self.nrOfSymbols=self.symbol_lines.count('\n') +1 
         print(f'self.nrOfSymbols={self.nrOfSymbols}')
     
-    
         # generate page distribution params
         [self.nr_of_boxes_per_line,self.nr_of_lines] = self.optimise_box_distribution()
         print(f'nr_of_boxes_per_line={self.nr_of_boxes_per_line}')
         print(f'nr_of_lines={self.nr_of_lines}')
-        
     
         # generate page settings
         self.page_setting_lines = self.generate_page_settings()
         print(f'self.page_setting_lines={self.page_setting_lines}')
         
-        
         # write page specifications to file
         self.write_txt(source_dir,self.page_setting_filename,ext,self.page_setting_lines)
+        
         
     # checks if file exists
     def files_exists(self,str):
