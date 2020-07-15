@@ -1,4 +1,4 @@
-nrOfSymbols = 5
+nrOfSymbols = 7
 boxWidth = 20
 boxHeight = 20
 nrOfBoxesPerLine = 7.0
