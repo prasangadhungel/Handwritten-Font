@@ -19,9 +19,9 @@
     \item \missingcommand{nrOfSymbols}
     \item \missingcommand{boxWidth}
     \item \missingcommand{boxHeight}
-    \item \missingcommand{nrOfBoxesPerLine}
-    \item \missingcommand{nrOfBoxesPerLineMinOne}
-    \item \missingcommand{nrOfLinesPerPage}
+    \item nrOfBoxesPerLine= \missingcommand{nrOfBoxesPerLine}
+    \item nrOfBoxesPerLineMinOne = \missingcommand{nrOfBoxesPerLineMinOne}
+    \item nrOfLinesPerPage= \missingcommand{nrOfLinesPerPage}
     \item \missingcommand{nrOfLinesPerPageMinOne}
 \end{itemize}
 
@@ -67,6 +67,10 @@
 \newcounter{ct3}
 \newcounter{ct4}
 
+% set a symbol counter
+\newcounter{sym_index}
+\setcounter{sym_index}{0}%
+
 %loop through lines
 \newpage
 \hspace{-1.1em} % SHift top row left to prevent some section indentation
@@ -80,8 +84,13 @@
         row sep=-3pt,column sep=-\missingcommand{boxWidth}*0.0mm] {
     % \hspace{-14em}   
         % create square with symbol in it.
-        \forloop{ct1}{1}{\value{ct1} < \missingcommand{nrOfBoxesPerLine}}{
-        \node[rectangle,minimum height=\missingcommand{boxWidth}mm,minimum width=\missingcommand{boxWidth}mm] {.}; \pgfmatrixnextcell
+        \forloop{ct1}{1}{\value{ct1} < \missingcommand{nrOfBoxesPerLine}}{  
+        
+        % increase the symbol count index by one
+        \addtocounter{sym_index}{1}
+         
+        \node[rectangle,minimum height=\missingcommand{boxWidth}mm,minimum width=\missingcommand{boxWidth}mm]
+        {.\missingcommand{\the\value{sym_index}}}; \pgfmatrixnextcell
         }\\
         
         % \hspace{-14em}
