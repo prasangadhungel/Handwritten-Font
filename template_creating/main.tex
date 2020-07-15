@@ -1,0 +1,60 @@
+\documentclass{article}
+\usepackage{geometry}
+ \geometry{
+ a4paper,
+ total={180mm,267mm},
+ left=-1mm,
+ top=5mm,
+ }
+
+% suppress page numbers
+\pagenumbering{gobble} 
+
+% Generate QR codes in LaTeX
+\usepackage{qrcode}  
+
+%Create boxes for qr codes
+\usepackage{tikz}
+\usetikzlibrary{shapes,snakes}
+
+% Read an array
+\usepackage{readarray}
+\usepackage{filecontents}
+
+% emulate file
+\begin{filecontents*}{symbol_spec.txt}
+nrOfSymbols = 30
+boxWidth = 3.2
+boxHeight = 2.2
+nrOfBoxesPerLine = 10
+nrOfBoxesPerLineMinOne = 9
+nrOfLinesPerPage = 6
+nrOfLinesPerPageMinOne = 5
+\end{filecontents*}
+
+\begin{filecontents*}{symbols.txt}
+1 = .
+2 = )
+3 = 3
+4 = a
+5 = A
+\end{filecontents*}
+
+
+% Create a shell for the variable variable names that are read from file
+\newcommand\missingcommand[1]{\csname DATA#1\endcsname}
+% define separator between variable name and variable value
+\readarraysepchar{=}
+
+% Enable latex to loop through variables
+\usepackage{forloop}
+
+% TODO: Change encoding to adapt to different languages based on what read_symbol_specs contains
+\usepackage[utf8x]{inputenc}
+
+\newcommand\customfont[1]{{\usefont{T1}{custom}{m}{n} #1 }}
+
+
+\begin{document}
+\input{test}
+\end{document}
