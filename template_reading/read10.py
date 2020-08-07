@@ -176,39 +176,19 @@ class ReadTemplate:
         for i in range(0,len(self.ROIs)):
             # get qr code dimensions
             img = self.ROIs[i]
-            
-            # override from horn qr code
-            # load and show an image with Pillow
-            # from PIL import Image
-            # img = Image.open('elbow.png')
-            # img = np.array(img)
-            # print(f'img={img}')
-            # print(f'img={img.shape}')
-            
-            # qr_arr = self.binary_string(img,True)
-            # self.ndarray_to_txt(qr_arr)
-            
-            # height = img.shape[0]
-            # width = img.shape[1]
-            
-            # qr = img[height-width:height].astype(int)
-            # self.binary_string(qr)
-            
-            self.preprocess_qrcode(cv2.imread(f'{self.output_dir}/ROI_{i}.png'))
+            qrcode = self.preprocess_qrcode(cv2.imread(f'{self.output_dir}/ROI_{i}.png'))
             
             # Read qr from contour
-            qrcode = decode(img)
+            #qrcode = decode(img)
             print(f'nr of qr codes = {len(qrcode)}')
             
-            for i in range(0,len(qrcode)):
-            #for i in range(0,1):
-            
+            if len(qrcode)>0:
                 # Get the rect/contour coordinates:
                 left = qrcode[0].rect[0]
                 top = qrcode[0].rect[1]
                 width = qrcode[0].rect[2]
                 height = qrcode[0].rect[3]
-                print(f'left={left},top={top},width={width},height={height}\n\n and image height={img.height}\n\n and image width={img.width}')
+                print(f'left={left},top={top},width={width},height={height}')#\n\n and image height={img.height}\n\n and image width={img.width}')
                 
                 # get the rectangular contour corner coordinates
                 # top_left = [top,left]
@@ -220,8 +200,9 @@ class ReadTemplate:
                 # bottom_right = [top-height,left+width]
                 # print(f'bottom_right={bottom_right}')
                 
-                self.show_qr(img,left,top,width,height)
+                #self.show_qr(img,left,top,width,height)
                 
+    # Source of magic preprocessing settings: https://stackoverflow.com/questions/50080949/qr-code-detection-from-pyzbar-with-camera-image
     def preprocess_qrcode(self,image):
         # thresholds image to white in back then invert it to black in white
         #   try to just the BGR values of inRange to get the best result

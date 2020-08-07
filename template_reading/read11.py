@@ -51,7 +51,7 @@ class ReadTemplate:
         self.spec_loc = f'../template_creating/{self.spec_filename}'
         self.read_image_specs()
         self.output_dir = "out"
-        self.img_path = 'testfiles/out0.jpg'
+        self.img_path = 'testfiles/out3.jpg'
         
         # execute file reading steps
         self.clear_output_folder()
@@ -113,22 +113,34 @@ class ReadTemplate:
         gray_img = color_img.mean(axis=2)
         return gray_img
     
+    # Source of magic preprocessing settings: https://stackoverflow.com/questions/50080949/qr-code-detection-from-pyzbar-with-camera-image
+    def preprocess_qrcode(self,image):
+        # thresholds image to white in back then invert it to black in white
+        #   try to just the BGR values of inRange to get the best result
+        mask = cv2.inRange(image,(0,0,0),(200,200,200))
+        thresholded = cv2.cvtColor(mask,cv2.COLOR_GRAY2BGR)
+        inverted = 255-thresholded # black-in-white
+        qrcode = decode(inverted)
+        print(f'qrcode={qrcode}')
+        return qrcode
+    
     # read the qr code from an image
     def read_qr_imgs(self):
         #qrcode = decode(self.image)
         #print(f'Nr of qr codes = {len(qrcode)}')
         img = Image.open(self.img_path)
-        qrcode = decode(img)
+        #qrcode = decode(img)
+        qrcode = self.preprocess_qrcode(cv2.imread(self.img_path))
         print(f'nr of qr codes = {len(qrcode)}')
         
         for i in range(0,len(qrcode)):
         #for i in range(0,1):
         
             # Get the rect/contour coordinates:
-            left = qrcode[0].rect[0]
-            top = qrcode[0].rect[1]
-            width = qrcode[0].rect[2]
-            height = qrcode[0].rect[3]
+            left = qrcode[i].rect[0]
+            top = qrcode[i].rect[1]
+            width = qrcode[i].rect[2]
+            height = qrcode[i].rect[3]
             print(f'left={left},top={top},width={width},height={height}\n\n and image height={img.height}\n\n and image width={img.width}')
             
             # get the rectangular contour corner coordinates
@@ -141,16 +153,16 @@ class ReadTemplate:
             # bottom_right = [top-height,left+width]
             # print(f'bottom_right={bottom_right}')
             
-            self.show_qr(img,left,top,width,height)
+            self.show_qr(img,left,top,width,height,i)
             
-    def show_qr(self,img,left,top,width,height):
+    def show_qr(self,img,left,top,width,height,i):
         #im_crop = self.image.crop((tl[1], tl[0], tr[1], bl[0]))
         #self.image.show()
         #box=(left, upper, right, lower).
         print(f'left={left}\n upper={top}\n right={left+width}\n lower={top+height}')
         im_crop = img.crop((left,top,left+width,top+height))
-        im_crop.save('out/my.png')
-        im_crop.show()
+        im_crop.save(f'out/{i}.png')
+        #im_crop.show()
         #im_crop.save('data/dst/lena_pillow_crop.jpg', quality=95)
         
     def ndarray_to_txt(self,arr):
