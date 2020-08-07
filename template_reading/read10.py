@@ -15,7 +15,8 @@ import re
 import sys
 from io import StringIO ## for Python 3
 from pdf2image import convert_from_path
-
+from pyzbar.pyzbar import decode
+from PIL import Image
 
 class ReadTemplate:
     
@@ -62,10 +63,10 @@ class ReadTemplate:
         
     def convert_pdf_to_img(self):
         # first convert the pdf into separate images        
-        pages = convert_from_path('filled.pdf', 500)
+        pages = convert_from_path('testfiles/filled.pdf', 500)
         count=0
         for page in pages:
-            page.save(f'out{count}.jpg', 'JPEG')
+            page.save(f'testfiles/out{count}.jpg', 'JPEG')
             count = count+ 1
 
     # TODO: Scan the directory for a single pdf.
@@ -74,7 +75,7 @@ class ReadTemplate:
     # TODO: Loop through all qr codes
     # Load image, grayscale, Gaussian blur, Otsu's threshold
     def load_image(self):
-        image = cv2.imread('out3.jpg')
+        image = cv2.imread('testfiles/out3.jpg')
         original = image.copy()
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blur = cv2.GaussianBlur(gray, (9,9), 0)
@@ -123,8 +124,10 @@ class ReadTemplate:
             ROI_symbol_gray = self.convert_img_to_grayscale(ROI_symbol)
             
             # export images
-            cv2.imwrite(f'{self.output_dir}/ROI_{len(ROIs)}_ar_{ar}.png', ROI_gray)
-            cv2.imwrite(f'{self.output_dir}/ROI_symbol_{len(ROIs)}_ar_{ar}.png', ROI_symbol_gray)
+            #cv2.imwrite(f'{self.output_dir}/ROI_{len(ROIs)}_ar_{ar}.png', ROI_gray)
+            #cv2.imwrite(f'{self.output_dir}/ROI_symbol_{len(ROIs)}_ar_{ar}.png', ROI_symbol_gray)
+            cv2.imwrite(f'{self.output_dir}/ROI_{len(ROIs)}.png', ROI_gray)
+            cv2.imwrite(f'{self.output_dir}/ROI_symbol_{len(ROIs)}.png', ROI_symbol_gray)
             ROIs.append(ROI_gray)
             ROIs_symbol.append(ROI_symbol_gray)
         return ROIs,ROIs_symbol
@@ -176,41 +179,68 @@ class ReadTemplate:
             
             # override from horn qr code
             # load and show an image with Pillow
-            from PIL import Image
-            img = Image.open('elbow.png')
-            img = np.array(img)
-            print(f'img={img}')
-            print(f'img={img.shape}')
+            # from PIL import Image
+            # img = Image.open('elbow.png')
+            # img = np.array(img)
+            # print(f'img={img}')
+            # print(f'img={img.shape}')
             
-            qr_arr = self.binary_string(img,True)
-            self.ndarray_to_txt(qr_arr)
+            # qr_arr = self.binary_string(img,True)
+            # self.ndarray_to_txt(qr_arr)
             
-            height = img.shape[0]
-            width = img.shape[1]
+            # height = img.shape[0]
+            # width = img.shape[1]
             
-            qr = img[height-width:height].astype(int)
-            self.binary_string(qr)
+            # qr = img[height-width:height].astype(int)
+            # self.binary_string(qr)
             
-            #cv2.imwrite(f'{self.output_dir}/qr_{i}.png', qr)
-            #self.ndarray_to_txt(qr)
+            self.preprocess_qrcode(cv2.imread(f'{self.output_dir}/ROI_{i}.png'))
             
-            # Source: https://www.thepythoncode.com/article/generate-read-qr-code-python
+            # Read qr from contour
+            qrcode = decode(img)
+            print(f'nr of qr codes = {len(qrcode)}')
             
+            for i in range(0,len(qrcode)):
+            #for i in range(0,1):
             
-            # Source: https://stackoverflow.com/questions/27233351/how-to-decode-a-qr-code-image-in-preferably-pure-python
-            # Decode qr cod
-            # requires zbar
-            # import qrtools
-            # from qrtools import qrtools 
-            # qrtool = qrtools.QR()
-            # qrtool.decode(qr)
-            # print(qrtool.data)
+                # Get the rect/contour coordinates:
+                left = qrcode[0].rect[0]
+                top = qrcode[0].rect[1]
+                width = qrcode[0].rect[2]
+                height = qrcode[0].rect[3]
+                print(f'left={left},top={top},width={width},height={height}\n\n and image height={img.height}\n\n and image width={img.width}')
+                
+                # get the rectangular contour corner coordinates
+                # top_left = [top,left]
+                # print(f'top_left={top_left}')
+                # top_right = [top,left+width]
+                # print(f'top_right={top_right}')
+                # bottom_left = [top-height,left]
+                # print(f'bottom_left={bottom_left}')
+                # bottom_right = [top-height,left+width]
+                # print(f'bottom_right={bottom_right}')
+                
+                self.show_qr(img,left,top,width,height)
+                
+    def preprocess_qrcode(self,image):
+        # thresholds image to white in back then invert it to black in white
+        #   try to just the BGR values of inRange to get the best result
+        mask = cv2.inRange(image,(0,0,0),(200,200,200))
+        thresholded = cv2.cvtColor(mask,cv2.COLOR_GRAY2BGR)
+        inverted = 255-thresholded # black-in-white
+        qrcode = decode(inverted)
+        print(f'qrcode={qrcode}')
+        return qrcode
             
-            
-            # Source: https://github.com/svartalf/python-quirc/blob/master/examples/decode_opencv.py
-            # Source: https://python-quirc.readthedocs.io/en/latest/usage/high-level.html
-            # pip install quirc
-            # does not register import cv in python 3
+    def show_qr(self,img,left,top,width,height):
+        #im_crop = self.image.crop((tl[1], tl[0], tr[1], bl[0]))
+        #self.image.show()
+        #box=(left, upper, right, lower).
+        print(f'left={left}\n upper={top}\n right={left+width}\n lower={top+height}')
+        im_crop = img.crop((left,top,left+width,top+height))
+        im_crop.save('out/my.png')
+        im_crop.show()
+        #im_crop.save('data/dst/lena_pillow_crop.jpg', quality=95)
             
             
     def ndarray_to_txt(self,arr):
