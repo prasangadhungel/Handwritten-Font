@@ -50,7 +50,7 @@ class ReadTemplate:
         self.image, self.original,self.thresh = self.load_image()
         self.close,self.kernel = self.morph_image()
         self.cnts = self.find_contours()
-        self.ROIs,self.ROIs_symbol = self.loop_through_contours()
+        self.ROIs,self.ROIs_symbol,self.ROIs_pos,self.ROIs_symbol_pos = self.loop_through_contours()
         self.read_qr_imgs()
         # self.()
         
@@ -98,26 +98,37 @@ class ReadTemplate:
     def loop_through_contours(self):
         ROIs = []
         ROIs_symbol = []
+        ROIs_pos = []
+        ROIs_symbol_pos = []
         for c in self.cnts:
             peri = cv2.arcLength(c, True)
             approx = cv2.approxPolyDP(c, 0.04 * peri, True) # number of sides of polygon?
             x,y,w,h = cv2.boundingRect(approx)
             area = cv2.contourArea(c)
             ar = w / float(h)
-            ROIs,ROIs_symbol = self.select_qr_contours(approx,ar,area,h,w,x,y,ROIs,ROIs_symbol)
-        return ROIs,ROIs_symbol
+            ROIs,ROIs_symbol,ROIs_pos,ROIs_symbol_pos = self.select_qr_contours(approx,ar,area,h,w,x,y,ROIs,ROIs_symbol,ROIs_pos,ROIs_symbol_pos)
+        return ROIs,ROIs_symbol,ROIs_pos,ROIs_symbol_pos
         
     # TODO: change len(approx) to a standardized value from qr code sizes
     # TODO: change area size to output of box size in symbol_spec.txt
     # TODO: change ar size to output of box size in symbol_spec.txt    
     # Selects the contours based on their geometrics vs symbol spec file outputed by template creation
-    def select_qr_contours(self,approx,ar,area,h,w,x,y,ROIs,ROIs_symbol):
+    def select_qr_contours(self,approx,ar,area,h,w,x,y,ROIs,ROIs_symbol,ROIs_pos,ROIs_symbol_pos):
         # if len(approx) == 4 and area > 1000 and (ar > .85 and ar < 1.3):
         #if len(approx) == 3 and area > 1000:
         if area > 10000 and (ar > .3 and ar < 0.38):
             cv2.rectangle(self.image, (x, y), (x + w, y + h), (36,255,12), 3)
             ROI = self.original[y:y+h, x:x+w]
             ROI_symbol = self.original[y-h:y, x:x+w]
+            
+            # left = qrcode[0].rect[0]
+            # top = qrcode[0].rect[1]
+            # width = qrcode[0].rect[2]
+            # height = qrcode[0].rect[3]
+            
+            #ROI_pos =[left,top,width,height] measured from top to bottom and left edge to right
+            ROI_pos =[x,y+h,w,h]
+            ROI_symbol_pos = [x,y,w,h]
             
             # convert images to grayscale
             ROI_gray = self.convert_img_to_grayscale(ROI)
@@ -130,7 +141,9 @@ class ReadTemplate:
             cv2.imwrite(f'{self.output_dir}/ROI_symbol_{len(ROIs)}.png', ROI_symbol_gray)
             ROIs.append(ROI_gray)
             ROIs_symbol.append(ROI_symbol_gray)
-        return ROIs,ROIs_symbol
+            ROIs_pos.append(ROI_pos)
+            ROIs_symbol_pos.append(ROI_symbol_pos)
+        return ROIs,ROIs_symbol,ROIs_pos,ROIs_symbol_pos
             
     # Shows relevant countours which are believed to contain qr code.
     def show_qr_images(ROI,ROI_symbol):
@@ -175,20 +188,52 @@ class ReadTemplate:
     def read_qr_imgs(self):
         for i in range(0,len(self.ROIs)):
             # get qr code dimensions
-            img = self.ROIs[i]
-            qrcode = self.preprocess_qrcode(cv2.imread(f'{self.output_dir}/ROI_{i}.png'))
+            contour = self.ROIs[i]
+            img = cv2.imread(f'{self.output_dir}/ROI_{i}.png')
+            qrcode = self.preprocess_qrcode(img)
             
             # Read qr from contour
-            #qrcode = decode(img)
+            #qrcode = decode(contour)
             print(f'nr of qr codes = {len(qrcode)}')
             
             if len(qrcode)>0:
-                # Get the rect/contour coordinates:
-                left = qrcode[0].rect[0]
-                top = qrcode[0].rect[1]
-                width = qrcode[0].rect[2]
-                height = qrcode[0].rect[3]
-                print(f'left={left},top={top},width={width},height={height}')#\n\n and image height={img.height}\n\n and image width={img.width}')
+                # Get the qr coordinates relative to the contour:
+                left_qr_cont = qrcode[0].rect[0]
+                top_qr_cont = qrcode[0].rect[1]
+                width_qr_cont = qrcode[0].rect[2]
+                height_qr_cont = qrcode[0].rect[3]
+                print(f'relative qr code positions = left={left_qr_cont},top={top_qr_cont},width={width_qr_cont},height={height_qr_cont}')
+        
+                
+                left_ct = self.ROIs_pos[i][0]
+                top_ct = self.ROIs_pos[i][1]
+                width_ct = self.ROIs_pos[i][2]
+                height_ct = self.ROIs_pos[i][3]
+                bottom_ct = top_ct+height_ct
+                right_ct = left_ct+width_ct        
+                print(f'The original contour coordinates are= left={left_ct},top={top_ct},bottom={bottom_ct},right={right_ct}\n\n')
+        
+                
+                # compute qr position
+                top_qr = top_ct+top_qr_cont
+                left_qr = left_ct+left_qr_cont
+                bottom_qr =top_ct+top_qr_cont+height_qr_cont
+                right_qr = left_ct+ left_qr_cont+width_qr_cont
+   
+                from matplotlib import pyplot as plt
+                #full_img=Image.open(f'{self.output_dir}/ROI_{i}.png')
+                #full_img = cv2.imread('testfiles/out3.jpg')
+                full_img=Image.open('testfiles/out3.jpg')
+                print(full_img.size)
+                
+                contour = full_img.crop((left_ct,top_ct,right_ct,bottom_ct))
+                contour.save(f'out/contour{i}.png')
+                #im_crop.show()
+                
+                print(f'left={left_qr}\n upper={top_qr}\n right={right_qr}\n lower={bottom_qr}')
+                im_crop = full_img.crop((left_qr,top_qr,right_qr,bottom_qr))
+                im_crop.save(f'out/crop{i}.png')
+                #im_crop.show()
                 
                 # get the rectangular contour corner coordinates
                 # top_left = [top,left]
@@ -200,7 +245,7 @@ class ReadTemplate:
                 # bottom_right = [top-height,left+width]
                 # print(f'bottom_right={bottom_right}')
                 
-                #self.show_qr(img,left,top,width,height)
+                #self.show_qr(contour,left,top,width,height)
                 
     # Source of magic preprocessing settings: https://stackoverflow.com/questions/50080949/qr-code-detection-from-pyzbar-with-camera-image
     def preprocess_qrcode(self,image):
