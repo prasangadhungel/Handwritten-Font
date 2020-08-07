@@ -4,3 +4,4 @@
 *.synctex.gz
 
 /examples/*
+/template_reading/testfiles/*
