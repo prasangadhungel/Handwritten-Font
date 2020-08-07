@@ -211,6 +211,14 @@ class ReadTemplate:
                 left_qr = left_ct+left_qr_cont
                 bottom_qr =top_ct+top_qr_cont+height_qr_cont
                 right_qr = left_ct+ left_qr_cont+width_qr_cont
+                
+                # compute handwritten symbol position
+                vert_focus_margin = 0.95
+                hori_focus_margin = 0.94
+                top_sym = top_qr-height_qr_cont*vert_focus_margin
+                left_sym = left_qr+width_qr_cont*(1-hori_focus_margin)
+                bottom_sym = top_qr-height_qr_cont*(1-vert_focus_margin)
+                right_sym = right_qr-width_qr_cont*(1-hori_focus_margin)
    
                 from matplotlib import pyplot as plt
                 #full_img=Image.open(f'{self.output_dir}/ROI_{i}.png')
@@ -225,19 +233,9 @@ class ReadTemplate:
                 print(f'left={left_qr}\n upper={top_qr}\n right={right_qr}\n lower={bottom_qr}')
                 im_crop = full_img.crop((left_qr,top_qr,right_qr,bottom_qr))
                 im_crop.save(f'out/crop{i}.png')
-                #im_crop.show()
                 
-                # get the rectangular contour corner coordinates
-                # top_left = [top,left]
-                # print(f'top_left={top_left}')
-                # top_right = [top,left+width]
-                # print(f'top_right={top_right}')
-                # bottom_left = [top-height,left]
-                # print(f'bottom_left={bottom_left}')
-                # bottom_right = [top-height,left+width]
-                # print(f'bottom_right={bottom_right}')
-                
-                #self.show_qr(contour,left,top,width,height)
+                sym_crop = full_img.crop((left_sym,top_sym,right_sym,bottom_sym))
+                sym_crop.save(f'out/symbol_{i}.png')
                 
     # Source of magic preprocessing settings: https://stackoverflow.com/questions/50080949/qr-code-detection-from-pyzbar-with-camera-image
     def preprocess_qrcode(self,image):
