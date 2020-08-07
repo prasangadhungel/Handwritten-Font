@@ -50,7 +50,7 @@ class ReadTemplate:
         self.image, self.original,self.thresh = self.load_image()
         self.close,self.kernel = self.morph_image()
         self.cnts = self.find_contours()
-        self.ROIs,self.ROIs_symbol,self.ROIs_pos,self.ROIs_symbol_pos = self.loop_through_contours()
+        self.ROIs,self.ROIs_pos= self.loop_through_contours()
         self.read_qr_imgs()
         # self.()
         
@@ -97,29 +97,28 @@ class ReadTemplate:
     # loop through all contours and find their respective positions
     def loop_through_contours(self):
         ROIs = []
-        ROIs_symbol = []
         ROIs_pos = []
-        ROIs_symbol_pos = []
+        
         for c in self.cnts:
             peri = cv2.arcLength(c, True)
             approx = cv2.approxPolyDP(c, 0.04 * peri, True) # number of sides of polygon?
             x,y,w,h = cv2.boundingRect(approx)
             area = cv2.contourArea(c)
             ar = w / float(h)
-            ROIs,ROIs_symbol,ROIs_pos,ROIs_symbol_pos = self.select_qr_contours(approx,ar,area,h,w,x,y,ROIs,ROIs_symbol,ROIs_pos,ROIs_symbol_pos)
-        return ROIs,ROIs_symbol,ROIs_pos,ROIs_symbol_pos
+            ROIs,ROIs_pos= self.select_qr_contours(approx,ar,area,h,w,x,y,ROIs,ROIs_pos)
+        return ROIs,ROIs_pos
         
     # TODO: change len(approx) to a standardized value from qr code sizes
     # TODO: change area size to output of box size in symbol_spec.txt
     # TODO: change ar size to output of box size in symbol_spec.txt    
     # Selects the contours based on their geometrics vs symbol spec file outputed by template creation
-    def select_qr_contours(self,approx,ar,area,h,w,x,y,ROIs,ROIs_symbol,ROIs_pos,ROIs_symbol_pos):
+    def select_qr_contours(self,approx,ar,area,h,w,x,y,ROIs,ROIs_pos):
         # if len(approx) == 4 and area > 1000 and (ar > .85 and ar < 1.3):
         #if len(approx) == 3 and area > 1000:
         if area > 10000 and (ar > .3 and ar < 0.38):
             cv2.rectangle(self.image, (x, y), (x + w, y + h), (36,255,12), 3)
             ROI = self.original[y:y+h, x:x+w]
-            ROI_symbol = self.original[y-h:y, x:x+w] # this is not a new contour, this is just a selection of the contour directly below the found contour
+            
             
             # left = qrcode[0].rect[0]
             # top = qrcode[0].rect[1]
@@ -127,31 +126,24 @@ class ReadTemplate:
             # height = qrcode[0].rect[3]
             
             #ROI_pos =[left,top,width,height] measured from top to bottom and left edge to right
-            ROI_pos =[x,y+h,w,h]
-            ROI_symbol_pos = [x,y,w,h]
+            ROI_pos =[x,y,w,h]
             
             # convert images to grayscale
             ROI_gray = self.convert_img_to_grayscale(ROI)
-            ROI_symbol_gray = self.convert_img_to_grayscale(ROI_symbol)
             
             # export images
             #cv2.imwrite(f'{self.output_dir}/ROI_{len(ROIs)}_ar_{ar}.png', ROI_gray)
-            #cv2.imwrite(f'{self.output_dir}/ROI_symbol_{len(ROIs)}_ar_{ar}.png', ROI_symbol_gray)
             cv2.imwrite(f'{self.output_dir}/ROI_{len(ROIs)}.png', ROI_gray)
-            cv2.imwrite(f'{self.output_dir}/ROI_symbol_{len(ROIs)}.png', ROI_symbol_gray)
             ROIs.append(ROI_gray)
-            ROIs_symbol.append(ROI_symbol_gray)
             ROIs_pos.append(ROI_pos)
-            ROIs_symbol_pos.append(ROI_symbol_pos)
-        return ROIs,ROIs_symbol,ROIs_pos,ROIs_symbol_pos
+        return ROIs,ROIs_pos
             
     # Shows relevant countours which are believed to contain qr code.
-    def show_qr_images(ROI,ROI_symbol):
+    def show_qr_images(ROI):
         cv2.imshow('thresh', thresh)
         cv2.imshow('close', close)
         cv2.imshow('image', self.image)
         cv2.imshow('ROI', ROI)
-        cv2.imshow('ROI_symbol', ROI_symbol)
         cv2.waitKey()
     
     # read image specs
