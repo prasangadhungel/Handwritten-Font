@@ -214,6 +214,9 @@ class ReadTemplate:
     # reads the qr codes, finds written symbol and exports symbol as picture with the id contained in the qr code.
     def read_qr_imgs(self):
     
+        # reload full image
+        full_img=Image.open(self.img_name)
+    
         # loop through all regions of interest (that might contain qr code)
         for i in range(0,len(self.ROIs)):
             
@@ -222,6 +225,20 @@ class ReadTemplate:
             img = cv2.imread(f'{self.output_dir}/ROI_{i}.png')
             qrcode = self.preprocess_qrcode(img)
             print(f'nr of qr codes in ROI {i} is: {len(qrcode)}')
+            
+             # get the contour positions wrt the original image
+            left_ct = self.ROIs_pos[i][0]
+            top_ct = self.ROIs_pos[i][1]
+            width_ct = self.ROIs_pos[i][2]
+            height_ct = self.ROIs_pos[i][3]
+            bottom_ct = top_ct+height_ct
+            right_ct = left_ct+width_ct        
+            print(f'The original contour coordinates are= left={left_ct},top={top_ct},bottom={bottom_ct},right={right_ct}\n\n')
+            
+            # export the contour/ROI to the output folder for manual inspection
+            contour = full_img.crop((left_ct,top_ct,right_ct,bottom_ct))
+            contour.save(f'out/contour{i}.png')
+            
             
             # if the ROI contains a (legible) qr code
             if len(qrcode)>0:
@@ -236,14 +253,7 @@ class ReadTemplate:
                 height_qr_cont = qrcode[0].rect[3]
                 print(f'relative qr code positions = left={left_qr_cont},top={top_qr_cont},width={width_qr_cont},height={height_qr_cont}')
         
-                # get the contour positions wrt the original image
-                left_ct = self.ROIs_pos[i][0]
-                top_ct = self.ROIs_pos[i][1]
-                width_ct = self.ROIs_pos[i][2]
-                height_ct = self.ROIs_pos[i][3]
-                bottom_ct = top_ct+height_ct
-                right_ct = left_ct+width_ct        
-                print(f'The original contour coordinates are= left={left_ct},top={top_ct},bottom={bottom_ct},right={right_ct}\n\n')
+               
                 
                 # compute absolute qr position wrt original image
                 top_qr = top_ct+top_qr_cont
@@ -261,13 +271,6 @@ class ReadTemplate:
                 left_sym = left_qr+width_qr_cont*(1-hori_focus_margin)
                 bottom_sym = top_qr-height_qr_cont*(1-vert_focus_margin)
                 right_sym = right_qr-width_qr_cont*(1-hori_focus_margin)
-   
-                # reload full image
-                full_img=Image.open(self.img_name)
-                
-                # export the contour/ROI to the output folder for manual inspection
-                contour = full_img.crop((left_ct,top_ct,right_ct,bottom_ct))
-                contour.save(f'out/contour{i}.png')
                 
                 # crop the qr code from the original image and export it to output folder for manual inspection
                 im_crop = full_img.crop((left_qr,top_qr,right_qr,bottom_qr))
