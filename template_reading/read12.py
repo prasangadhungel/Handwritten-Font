@@ -21,19 +21,27 @@ from PIL import Image
 
 import scipy.signal
 import numpy as np
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 
 class ReadTemplate:
     
     # intializes object
     def __init__(self):
-        # Declare parameters
-        self.image = None
-        self.original = None
+        ## Declare parameters
+        # scanned filled image that is read in for processing
+        self.image = None 
+        # original scanned filled image that is read in staying unmodified for symbol extraction
+        self.original = None 
+        # black and white image
         self.gray = None
+        # blurred black and white image
         self.blur  = None
+        # blurred black and white image after filter with some threshold
         self.thresh = None
+        # the contours that are detected by the algorithm
         self.cnts = None
+        
+        ## Specifications that are outputed by the template creating module
         self.nrOfSymbols = None
         self.boxWidth = None
         self.boxHeight = None
@@ -42,76 +50,92 @@ class ReadTemplate:
         self.nrOfLinesPerPage = None
         self.nrOfLinesPerPageMinOne = None
         
-        # hardcode relative qr specification file location
+        ## hardcode script parameters
+        # relative qr specification file location
         self.spec_filename = 'symbol_spec.txt'
         self.spec_loc = f'../template_creating/{self.spec_filename}'
-        
+        # output directory for contours (used for temporary manual inspection of code)
         self.output_dir = "out"
-        
-        # Directory with the scanned/photographed templates that are being analysed
+        # scanned template pdf name
+        self.scanned_pdf_name = 'filled.pdf'
+        # Input directory with scanned/photographed filled templates
         self.input_dir = "in"
-        # directory to which the fonts are being exported
+        # output directory to which the fonts/letter/symbol images are being exported
         self.font_dir = 'font' 
-        self.overwrite = False # do not overwrite symbols that are already captured and exported
+        # False = do not overwrite symbols that are already captured and exported
+        self.overwrite = False
+        # The scanned/photographed filled template image that is being read.
         self.img_name = f'{self.input_dir}/p0.png'
         
         ## execute file reading steps
         # read the image specifications of the outputted pdf template
         self.read_image_specs() 
-        self.clear_output_folder() # clear the contour output folder (used for temporary manual inspection of code)
-        self.convert_pdf_to_img() # 
-        self.image, self.original,self.thresh = self.load_image()
+        # clear the contour output folder 
+        self.clear_output_folder() 
+        # the template is exported as pdf, and perhaps the scanned files are returned to pdf
+        # the code however only evaluates images, so pdfs are converted to images
+        self.nr_input_img = self.convert_pdf_to_img(f'{self.input_dir}/{self.scanned_pdf_name}') 
+        # Load the (processed) image(s) from the input folder self.input_dir
+        self.image, self.original,self.thresh = self.load_image(self.img_name)
+        # Apply morphing to image, don't know why necessary but it works
         self.close,self.kernel = self.morph_image()
+        # Finds the contours which the code thinks contain qr codes
         self.cnts = self.find_contours()
+        # Returns the regions of interest that actually contain qr codes
+        # ROI consists of 3 stacked blocks, on top the printed symbol, middle =written symbol,
+        # bottom is qr code
         self.ROIs,self.ROIs_pos= self.loop_through_contours()
+        # read the qr codes from the ROIs and export the found handwritten symbols
         self.read_qr_imgs()
         
-        
+    # clear the contour output folder 
     def clear_output_folder(self):
         for root, dirs, files in os.walk(self.output_dir):
             for file in files:
                 os.remove(os.path.join(root, file))
         
-    def convert_pdf_to_img(self):
+    # converts pdf (from input path) to set of images
+    def convert_pdf_to_img(self,path_to_pdf):
+        
         # first convert the pdf into separate images        
-        pages = convert_from_path(f'{self.input_dir}/filled.pdf', 500)
+        pages = convert_from_path(path_to_pdf, 500)
         count=0
         for page in pages:
             page.save(f'{self.input_dir}/out{count}.jpg', 'JPEG')
             count = count+ 1
+        return count
 
-    # TODO: Scan the directory for a single pdf.
-    # TODO: Loop per page
-    # TODO: change the dimensions of the searched qr code based on the outputted specs in create template from symbol_spec.txt
-    # TODO: Loop through all qr codes
-    # Load image, grayscale, Gaussian blur, Otsu's threshold
-    def load_image(self):
-        image = cv2.imread(self.img_name)
+    # loads image, makes a copy to keep as original, applies blur, 
+    # outputs blurred image and applies a filtering threshold to image
+    # returns the image for modification, the original image and the thresholded image
+    def load_image(self,img_name):
+        image = cv2.imread(img_name)
         original = image.copy()
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blur = cv2.GaussianBlur(gray, (9,9), 0)
-        #blur.save(f'out/blur.png')
         cv2.imwrite(f'{self.output_dir}/blur.png', blur)
         thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
         return image,original,thresh
         
-    # Morph close
+    # returns and generates a morphing kernal and something/close
+    # based on the blurred thresholded image
     def morph_image(self):
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
         close = cv2.morphologyEx(self.thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
         return close,kernel
 
-    # Find contours and filter for QR code
+    # Find contours and filter for QR code from the blurred and thresholded image
     def find_contours(self):
         cnts = cv2.findContours(self.close, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnts = cnts[0] if len(cnts) == 2 else cnts[1]
         return cnts
 
-    # loop through all contours and find their respective positions
+    # returns the region of interest (ROI) and ROI pixelwise corner coordinates in original image
     def loop_through_contours(self):
         ROIs = []
         ROIs_pos = []
         
+        # loop through contours
         for c in self.cnts:
             #if len(ROIs) <2: # for quick debugging on single succesfull qr code
             peri = cv2.arcLength(c, True)
@@ -127,16 +151,12 @@ class ReadTemplate:
     # TODO: change ar size to output of box size in symbol_spec.txt    
     # Selects the contours based on their geometrics vs symbol spec file outputed by template creation
     def select_qr_contours(self,approx,ar,area,h,w,x,y,ROIs,ROIs_pos):
-        # if len(approx) == 4 and area > 1000 and (ar > .85 and ar < 1.3):
-        #if len(approx) == 3 and area > 1000:
-        if area > 100 and (ar > .25 and ar < 0.38):
+        
+        # area is the nr of minimum pixels a ROI must have
+        # ar is the aspect ratio (width/height)
+        if area > 100 and (ar > .25 and ar < 0.4):
             cv2.rectangle(self.image, (x, y), (x + w, y + h), (36,255,12), 3)
             ROI = self.original[y:y+h, x:x+w]
-            
-            # left = qrcode[0].rect[0]
-            # top = qrcode[0].rect[1]
-            # width = qrcode[0].rect[2]
-            # height = qrcode[0].rect[3]
             
             #ROI_pos =[left,top,width,height] measured from top to bottom and left edge to right
             ROI_pos =[x,y,w,h]
@@ -144,23 +164,18 @@ class ReadTemplate:
             # convert images to grayscale
             ROI_gray = self.convert_img_to_grayscale(ROI)
             
-            # blur roi
-            #blur = cv2.GaussianBlur(ROI_gray, (25,25), 0)
-            #blur = cv2.GaussianBlur(ROI_gray, (3,3), 1)
-            blur = self.smoothen_img(ROI_gray)
-            
-            #thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-            ROI_gray = blur
+            # blur/smoothen roi
+            ROI_gray = self.smoothen_img(ROI_gray)
             
             # export images
-            #cv2.imwrite(f'{self.output_dir}/ROI_{len(ROIs)}_ar_{ar}.png', ROI_gray)
             cv2.imwrite(f'{self.output_dir}/ROI_{len(ROIs)}.png', ROI_gray)
             ROIs.append(ROI_gray)
             ROIs_pos.append(ROI_pos)
         return ROIs,ROIs_pos
             
+    # applies a smoothing to the ROI to enhance qr detection rate in grainy images
     def smoothen_img(self,im):
-        # make some kind of kernel, there are many ways to do this...
+        # make a smoothing kernel
         t = 1 - np.abs(np.linspace(-1, 1, 21))
         kernel = t.reshape(21, 1) * t.reshape(1, 21)
         kernel /= kernel.sum()   # kernel should sum to 1!  :) 
@@ -169,32 +184,10 @@ class ReadTemplate:
         print(f'im.shape={im.shape}')
         im_out = scipy.signal.convolve2d(im, kernel, mode='same')
         
-        # stack the channels back into a 8-bit colour depth image and plot it
-        # im_out = (im_out * 255).astype(np.uint8) 
-
-        # plt.subplot(2,1,1)
-        # plt.imshow(im)
-        # plt.subplot(2,1,2)
-        # plt.imshow(im_out)
-        # plt.show()
         return im_out
     
-    # Shows relevant countours which are believed to contain qr code.
-    def show_qr_images(ROI):
-        cv2.imshow('thresh', thresh)
-        cv2.imshow('close', close)
-        cv2.imshow('image', self.image)
-        cv2.imshow('ROI', ROI)
-        cv2.waitKey()
-    
-    # read image specs
+    # read image specs from the specifications txt file
     def read_image_specs(self):
-        print(self.spec_loc)
-        #with open(self.spec_loc) as f:
-         #   content = f.readlines()
-        # you may also want to remove whitespace characters like `\n` at the end of each line
-        #content = [x.strip() for x in content] 
-        # Using readlines() 
         file1 = open(self.spec_loc, 'r') 
         Lines = file1.readlines() 
         self.nrOfSymbols = self.rhs_val_of_eq(Lines[0])
@@ -211,27 +204,29 @@ class ReadTemplate:
         rhs = line[start_index:]
         return ''.join(x for x in rhs if x.isdigit())
     
+    # returns image that is converted from (width x height x 3) (rgb) to:
+    # gray scale (width x height x 1) (blackwhite)
     def convert_img_to_grayscale(self,color_img):
-        #print(f'ROI[0]={color_img.shape}')
         gray_img = np.zeros((color_img.shape[0],color_img.shape[1]),dtype=int)
         gray_img = color_img.mean(axis=2)
-        
         return gray_img
     
+    # reads the qr codes, finds written symbol and exports symbol as picture with the id contained in the qr code.
     def read_qr_imgs(self):
+    
+        # loop through all regions of interest (that might contain qr code)
         for i in range(0,len(self.ROIs)):
-            # get qr code dimensions
+            
+            # get qr code from ROI
             contour = self.ROIs[i]
             img = cv2.imread(f'{self.output_dir}/ROI_{i}.png')
             qrcode = self.preprocess_qrcode(img)
+            print(f'nr of qr codes in ROI {i} is: {len(qrcode)}')
             
-            # Read qr from contour
-            #qrcode = decode(contour)
-            print(f'nr of qr codes = {len(qrcode)}')
-            
+            # if the ROI contains a (legible) qr code
             if len(qrcode)>0:
                 
-                # get qr code content
+                # get then encoded qr code content as decoded text
                 qr_content = self.get_qr_content(qrcode)
             
                 # Get the qr coordinates relative to the contour:
@@ -241,7 +236,7 @@ class ReadTemplate:
                 height_qr_cont = qrcode[0].rect[3]
                 print(f'relative qr code positions = left={left_qr_cont},top={top_qr_cont},width={width_qr_cont},height={height_qr_cont}')
         
-                
+                # get the contour positions wrt the original image
                 left_ct = self.ROIs_pos[i][0]
                 top_ct = self.ROIs_pos[i][1]
                 width_ct = self.ROIs_pos[i][2]
@@ -249,43 +244,45 @@ class ReadTemplate:
                 bottom_ct = top_ct+height_ct
                 right_ct = left_ct+width_ct        
                 print(f'The original contour coordinates are= left={left_ct},top={top_ct},bottom={bottom_ct},right={right_ct}\n\n')
-        
                 
-                # compute qr position
+                # compute absolute qr position wrt original image
                 top_qr = top_ct+top_qr_cont
                 left_qr = left_ct+left_qr_cont
                 bottom_qr =top_ct+top_qr_cont+height_qr_cont
                 right_qr = left_ct+ left_qr_cont+width_qr_cont
                 
-                # compute handwritten symbol position
+                # trim parameters for the edges of the symbol square to remove black borders of 
+                # the square around the handwritten symbol (space)
                 vert_focus_margin = 0.95
                 hori_focus_margin = 0.94
+                
+                # compute handwritten symbol position wrt original image
                 top_sym = top_qr-height_qr_cont*vert_focus_margin
                 left_sym = left_qr+width_qr_cont*(1-hori_focus_margin)
                 bottom_sym = top_qr-height_qr_cont*(1-vert_focus_margin)
                 right_sym = right_qr-width_qr_cont*(1-hori_focus_margin)
    
-                from matplotlib import pyplot as plt
-                #full_img=Image.open(f'{self.output_dir}/ROI_{i}.png')
-                #full_img = cv2.imread(f'{self.input_dir}/out3.jpg')
+                # reload full image
                 full_img=Image.open(self.img_name)
-                print(full_img.size)
                 
+                # export the contour/ROI to the output folder for manual inspection
                 contour = full_img.crop((left_ct,top_ct,right_ct,bottom_ct))
                 contour.save(f'out/contour{i}.png')
-                #im_crop.show()
                 
-                print(f'left={left_qr}\n upper={top_qr}\n right={right_qr}\n lower={bottom_qr}')
+                # crop the qr code from the original image and export it to output folder for manual inspection
                 im_crop = full_img.crop((left_qr,top_qr,right_qr,bottom_qr))
                 im_crop.save(f'out/crop{i}.png')
                 
+                # crop the handwritten symbol from the original image and export it to output folder for manual inspection
                 sym_crop = full_img.crop((left_sym,top_sym,right_sym,bottom_sym))
                 sym_crop.save(f'out/symbol_{i}_{qr_content}.png')
                 
+                # export the handwritten symbol to the font output directory
                 self.export_to_font(sym_crop,qr_content)
     
     # export font symbol
     def export_to_font(self, img,symbol_nr):
+        
         # first create font output folder if it doesnt exist yet
         if not os.path.exists(self.font_dir):
             os.makedirs(self.font_dir)
@@ -306,26 +303,17 @@ class ReadTemplate:
         qrcode = decode(inverted)
         print(f'qrcode={qrcode}')
         return qrcode
-        
+    
+    # returns the (decoded) content of the qr code as a string.
     def get_qr_content(self,qrcode):
-        print(f'qrcode[0].data={qrcode[0].data}')
+        # format of qr content is given as b'content' so remove b'
         content= str(qrcode[0].data)[2:]
-        print(f'content={content}')
+        # remove the last ' of the content format
         content = content[:-1]
-        print(f'content={content}')
         return content
-            
-    def show_qr(self,img,left,top,width,height):
-        #im_crop = self.image.crop((tl[1], tl[0], tr[1], bl[0]))
-        #self.image.show()
-        #box=(left, upper, right, lower).
-        print(f'left={left}\n upper={top}\n right={left+width}\n lower={top+height}')
-        im_crop = img.crop((left,top,left+width,top+height))
-        im_crop.save('out/my.png')
-        im_crop.show()
-        #im_crop.save('data/dst/lena_pillow_crop.jpg', quality=95)
-            
-            
+                
+    # unused method to export an image in ndarray format to a txt file.
+    # (to numerically inspect qr code images)
     def ndarray_to_txt(self,arr):
         str_arr = ""
         text_file = open("foo.txt", "w")
@@ -333,13 +321,17 @@ class ReadTemplate:
         text_file.write(str(arr))
         text_file.close()
     
+    # Converts a ndarray image (qr code) to a binary string at a threshold
+    # i.e. white = 0, black = 255, everything below 245 is mapped to 0, above to 1.
+    # this yields string of 0 and 1's (binary) string.
     def binary_string(self,arr, isbinary=False):
+        threshold = 245
         output = StringIO()
         for row in range(0,arr.shape[0]):
             for column in range(0,arr.shape[1]):
                 if (isbinary and arr[row][column]):
                     output.write('X')
-                elif arr[row][column]>245:
+                elif arr[row][column]>threshold:
                     output.write('X')
                 else:
                     output.write('_')
@@ -349,5 +341,6 @@ class ReadTemplate:
         
         return content
         
+# executes this main code
 if __name__ == '__main__':
     main = ReadTemplate()
