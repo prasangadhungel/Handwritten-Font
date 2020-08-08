@@ -84,13 +84,15 @@ class ReadTemplate:
         self.all_cnts = False
         self.no_cnts_filter = False
     
-        ## perform run on all images with specified configuration
-        self.loop_through_scanned_images(self.all_cnts,self.no_cnts_filter)
-        
-        # Perform run that first filters the contours/ROIs, then scans qr codes in ROIs
+        ## perform run on all images, scanning an entire page at once
         self.loop_through_scanned_images(self.all_cnts,True)
         
-        # redo but for all contours
+        # Perform run that first finds all contours,
+        # then filters the contours/ROIs on aspect ratio, 
+        # then scans qr codes in ROIs
+        self.loop_through_scanned_images(self.all_cnts,self.no_cnts_filter)
+        
+        # Perform run that finds all contours and scans qr codes in all of them
         if not self.found_all_symbols():
             self.loop_through_scanned_images(True,self.no_cnts_filter)
     
@@ -99,7 +101,6 @@ class ReadTemplate:
         
         # get a list of all input images
         input_files = [f for f in listdir(self.input_dir) if isfile(join(self.input_dir, f))]
-        print(f'onlyfiles={input_files}')
         
         for i in range(0,len(input_files)):
             
@@ -122,7 +123,7 @@ class ReadTemplate:
         # decode entire page at once if no_cnts_filter
         if (no_cnts_filter):
             print(f'img_name={img_name}')
-            self.decode_complete_page()
+            self.decode_complete_page(img_name)
         else: # first select ROIs then find qr codes in those ROIs only
             # Apply morphing to image, don't know why necessary but it works
             self.close,self.kernel = self.morph_image() 
@@ -135,26 +136,40 @@ class ReadTemplate:
             # read the qr codes from the ROIs and export the found handwritten symbols
             self.read_qr_imgs(img_name)
         
-    # decodes complete page at once
-    def decode_complete_page(self):
+    # decodes complete page at once for both original and thresholded image
+    def decode_complete_page(self,img_name):
         # read qrs directly from entire page
         qrcode = decode(self.image)
+        self.decode_image(img_name,qrcode)
+                
+        # read thesholded image
+        qrcode = decode(self.thresh)
+        self.decode_image(img_name,qrcode)
         
+    # performs actual decoding of qr codes on an image
+    def decode_image(self,img_name,qrcode):
         # find list of qr code content
         for i in range(0,len(qrcode)):
             
             # get the decoded text of the qr code
-            content = self.get_qr_content([qrcode[i]])# need to repack it as list
+            qr_content = self.get_qr_content([qrcode[i]])# need to repack it as list
         
             # check if a missing qr code is found
             missing_sym_indices = self.list_missing_symbols()
-            found_missing = self.list_contains_string(self.list_missing_symbols(), int(content))
+            found_missing = self.list_contains_string(self.list_missing_symbols(), int(qr_content))
             if found_missing:
-                print(f'FOUND MISSING={content}')
+                print(f'FOUND MISSING={qr_content}')
                 
-            
-        qrcode = decode(self.thresh)
-        print(f'self.thresh qrcode={qrcode}')
+                # compute coordinates of qr code
+                left_qr,top_qr,width_qr,height_qr = self.get_qr_coord(qrcode[i])
+                bottom_qr =top_qr+height_qr
+                right_qr = left_qr+width_qr
+                
+                # reload full image
+                full_img=Image.open(img_name)
+                
+                # export symbol to font directory
+                self.get_symbol(full_img,qr_content,top_qr,left_qr,bottom_qr,right_qr,width_qr,height_qr)
         
     # clear the contour output folder 
     def clear_output_folder(self):
@@ -253,7 +268,6 @@ class ReadTemplate:
         kernel /= kernel.sum()   # kernel should sum to 1!  :) 
 
         # convolve 2d the kernel with each channel
-        print(f'im.shape={im.shape}')
         im_out = scipy.signal.convolve2d(im, kernel, mode='same')
         
         return im_out
@@ -304,8 +318,7 @@ class ReadTemplate:
             width_ct = self.ROIs_pos[i][2]
             height_ct = self.ROIs_pos[i][3]
             bottom_ct = top_ct+height_ct
-            right_ct = left_ct+width_ct        
-            print(f'The original contour coordinates are= left={left_ct},top={top_ct},bottom={bottom_ct},right={right_ct}\n\n')
+            right_ct = left_ct+width_ct
             
             # export the contour/ROI to the output folder for manual inspection
             contour = full_img.crop((left_ct,top_ct,right_ct,bottom_ct))
@@ -319,42 +332,48 @@ class ReadTemplate:
                 qr_content = self.get_qr_content(qrcode) 
             
                 # TODO: Check if there is only 1 qr code in ROI
-                # Get the qr coordinates relative to the contour:
-                left_qr_cont = qrcode[0].rect[0]
-                top_qr_cont = qrcode[0].rect[1]
-                width_qr_cont = qrcode[0].rect[2]
-                height_qr_cont = qrcode[0].rect[3]
-                print(f'relative qr code positions = left={left_qr_cont},top={top_qr_cont},width={width_qr_cont},height={height_qr_cont}')
+                for j in range(0,len(qrcode)):
+                    left_qr_cont,top_qr_cont,width_qr_cont,height_qr_cont = self.get_qr_coord(qrcode[j])
+            
+                    # compute absolute qr position wrt original image
+                    top_qr = top_ct+top_qr_cont
+                    left_qr = left_ct+left_qr_cont
+                    bottom_qr =top_ct+top_qr_cont+height_qr_cont
+                    right_qr = left_ct+ left_qr_cont+width_qr_cont
+                    self.get_symbol(full_img,qr_content,top_qr,left_qr,bottom_qr,right_qr,width_qr_cont,height_qr_cont,i)
         
-               
-                
-                # compute absolute qr position wrt original image
-                top_qr = top_ct+top_qr_cont
-                left_qr = left_ct+left_qr_cont
-                bottom_qr =top_ct+top_qr_cont+height_qr_cont
-                right_qr = left_ct+ left_qr_cont+width_qr_cont
-                
-                # trim parameters for the edges of the symbol square to remove black borders of 
-                # the square around the handwritten symbol (space)
-                vert_focus_margin = 0.95
-                hori_focus_margin = 0.94
-                
-                # compute handwritten symbol position wrt original image
-                top_sym = top_qr-height_qr_cont*vert_focus_margin
-                left_sym = left_qr+width_qr_cont*(1-hori_focus_margin)
-                bottom_sym = top_qr-height_qr_cont*(1-vert_focus_margin)
-                right_sym = right_qr-width_qr_cont*(1-hori_focus_margin)
-                
-                # crop the qr code from the original image and export it to output folder for manual inspection
-                im_crop = full_img.crop((left_qr,top_qr,right_qr,bottom_qr))
-                im_crop.save(f'out/crop{i}.png')
-                
-                # crop the handwritten symbol from the original image and export it to output folder for manual inspection
-                sym_crop = full_img.crop((left_sym,top_sym,right_sym,bottom_sym))
-                sym_crop.save(f'out/symbol_{i}_{qr_content}.png')
-                
-                # export the handwritten symbol to the font output directory
-                self.export_to_font(sym_crop,qr_content)
+    def get_qr_coord(self,single_qrcode):
+    # Get the qr coordinates relative to the contour:
+        left_qr_cont = single_qrcode.rect[0]
+        top_qr_cont = single_qrcode.rect[1]
+        width_qr_cont = single_qrcode.rect[2]
+        height_qr_cont = single_qrcode.rect[3]
+        return left_qr_cont,top_qr_cont,width_qr_cont,height_qr_cont
+        
+    # gets the qr code, finds the symbol and exports the symbol
+    def get_symbol(self,full_img,qr_content,top_qr,left_qr,bottom_qr,right_qr,width_qr_cont,height_qr_cont,i=None):
+        
+        # trim parameters for the edges of the symbol square to remove black borders of 
+        # the square around the handwritten symbol (space)
+        vert_focus_margin = 0.95
+        hori_focus_margin = 0.94
+        
+        # compute handwritten symbol position wrt original image
+        top_sym = top_qr-height_qr_cont*vert_focus_margin
+        left_sym = left_qr+width_qr_cont*(1-hori_focus_margin)
+        bottom_sym = top_qr-height_qr_cont*(1-vert_focus_margin)
+        right_sym = right_qr-width_qr_cont*(1-hori_focus_margin)
+        
+        # crop the qr code from the original image and export it to output folder for manual inspection
+        im_crop = full_img.crop((left_qr,top_qr,right_qr,bottom_qr))
+        im_crop.save(f'out/crop{i}.png')
+        
+        # crop the handwritten symbol from the original image and export it to output folder for manual inspection
+        sym_crop = full_img.crop((left_sym,top_sym,right_sym,bottom_sym))
+        sym_crop.save(f'out/symbol_{i}_{qr_content}.png')
+        
+        # export the handwritten symbol to the font output directory
+        self.export_to_font(sym_crop,qr_content)
     
     # export font symbol
     def export_to_font(self, img,symbol_nr):
@@ -377,7 +396,6 @@ class ReadTemplate:
         thresholded = cv2.cvtColor(mask,cv2.COLOR_GRAY2BGR)
         inverted = 255-thresholded # black-in-white
         qrcode = decode(inverted)
-        print(f'qrcode={qrcode}')
         return qrcode
     
     # returns the (decoded) content of the qr code as a string.
