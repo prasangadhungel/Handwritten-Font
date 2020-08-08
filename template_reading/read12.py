@@ -10,6 +10,8 @@
 # pip install pdf2image
 #conda install -c conda-forge poppler
 import os, re, os.path
+from os import listdir
+from os.path import isfile, join
 import cv2
 import numpy as np
 import re
@@ -57,26 +59,57 @@ class ReadTemplate:
         # output directory for contours (used for temporary manual inspection of code)
         self.output_dir = "out"
         # scanned template pdf name
-        self.scanned_pdf_name = 'filled.pdf'
+        self.scanned_pdf_name = 'filled'
         # Input directory with scanned/photographed filled templates
         self.input_dir = "in"
         # output directory to which the fonts/letter/symbol images are being exported
         self.font_dir = 'font' 
         # False = do not overwrite symbols that are already captured and exported
         self.overwrite = False
-        # The scanned/photographed filled template image that is being read.
-        self.img_name = f'{self.input_dir}/p0.png'
+        # define types of images that are analysed
+        self.image_types = ['.png','jpg','jpeg']
+        
+        ## Convert scanned pdf file to images
+        # the template is exported as pdf, and perhaps the scanned files are returned to pdf
+        # the code however only evaluates images, so pdfs are converted to images
+        self.convert_pdf_to_img(self.input_dir,self.scanned_pdf_name)
+        
+        ## clear the contour output folder 
+        self.clear_output_folder() 
+        
+        ## Run configuration settings
+        self.all_cnts = False
+        self.no_cnts_filter = False
+    
+        ## perform run on all images with specified configuration
+        self.loop_through_scanned_images(self.all_cnts,self.no_cnts_filter)
+    
+    # loops through all pages of a scanned template pdf
+    def loop_through_scanned_images(self,all_cnts,no_cnts_filter):
+        
+        # get a list of all input images
+        input_files = [f for f in listdir(self.input_dir) if isfile(join(self.input_dir, f))]
+        print(f'onlyfiles={input_files}')
+        
+        for i in range(0,len(input_files)):
+            
+            # only analyse certain input image types
+            if any(map(input_files[i].__contains__, self.image_types)):
+            
+                # The scanned/photographed filled template image that is being read.
+                img_name = f'{self.input_dir}/{input_files[i]}'
+                
+                # find symbols by performing run
+                self.perform_sym_extraction_run(img_name,all_cnts,no_cnts_filter)
+        
+    # performs a run on an image based on run configuration settings    
+    def perform_sym_extraction_run(self,img_name,all_cnts,no_cnts_filter):
         
         ## execute file reading steps
         # read the image specifications of the outputted pdf template
         self.read_image_specs() 
-        # clear the contour output folder 
-        self.clear_output_folder() 
-        # the template is exported as pdf, and perhaps the scanned files are returned to pdf
-        # the code however only evaluates images, so pdfs are converted to images
-        self.nr_input_img = self.convert_pdf_to_img(f'{self.input_dir}/{self.scanned_pdf_name}') 
         # Load the (processed) image(s) from the input folder self.input_dir
-        self.image, self.original,self.thresh = self.load_image(self.img_name)
+        self.image, self.original,self.thresh = self.load_image(img_name)
         # Apply morphing to image, don't know why necessary but it works
         self.close,self.kernel = self.morph_image()
         # Finds the contours which the code thinks contain qr codes
@@ -86,7 +119,7 @@ class ReadTemplate:
         # bottom is qr code
         self.ROIs,self.ROIs_pos= self.loop_through_contours()
         # read the qr codes from the ROIs and export the found handwritten symbols
-        self.read_qr_imgs()
+        self.read_qr_imgs(img_name)
         
     # clear the contour output folder 
     def clear_output_folder(self):
@@ -95,15 +128,19 @@ class ReadTemplate:
                 os.remove(os.path.join(root, file))
         
     # converts pdf (from input path) to set of images
-    def convert_pdf_to_img(self,path_to_pdf):
+    def convert_pdf_to_img(self,path_to_pdf,pdf_name):
+        
+        # if scanned input folder contains a pdf file:
+        input_files = [f for f in listdir(self.input_dir) if isfile(join(self.input_dir, f))]
+        list_of_input_pdfs = [s for s in input_files if '.pdf' in s]
         
         # first convert the pdf into separate images        
-        pages = convert_from_path(path_to_pdf, 500)
-        count=0
-        for page in pages:
-            page.save(f'{self.input_dir}/out{count}.jpg', 'JPEG')
-            count = count+ 1
-        return count
+        for i in range(0,len(list_of_input_pdfs)):
+            pages = convert_from_path(f'{path_to_pdf}/{list_of_input_pdfs[i]}', 500)
+            count=0
+            for page in pages:
+                page.save(f'{self.input_dir}/{list_of_input_pdfs[i][:-4]}_{i}_{count}.jpg', 'JPEG')
+                count = count+ 1
 
     # loads image, makes a copy to keep as original, applies blur, 
     # outputs blurred image and applies a filtering threshold to image
@@ -212,10 +249,10 @@ class ReadTemplate:
         return gray_img
     
     # reads the qr codes, finds written symbol and exports symbol as picture with the id contained in the qr code.
-    def read_qr_imgs(self):
+    def read_qr_imgs(self,img_name):
     
         # reload full image
-        full_img=Image.open(self.img_name)
+        full_img=Image.open(img_name)
     
         # loop through all regions of interest (that might contain qr code)
         for i in range(0,len(self.ROIs)):
