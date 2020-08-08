@@ -69,6 +69,9 @@ class ReadTemplate:
         # define types of images that are analysed
         self.image_types = ['.png','jpg','jpeg']
         
+        ## read the image specifications of the outputted pdf template
+        self.read_image_specs()
+        
         ## Convert scanned pdf file to images
         # the template is exported as pdf, and perhaps the scanned files are returned to pdf
         # the code however only evaluates images, so pdfs are converted to images
@@ -79,10 +82,14 @@ class ReadTemplate:
         
         ## Run configuration settings
         self.all_cnts = False
-        self.no_cnts_filter = False
+        self.no_cnts_filter = True
     
         ## perform run on all images with specified configuration
         self.loop_through_scanned_images(self.all_cnts,self.no_cnts_filter)
+        exit()
+        # redo but for all contours
+        if not self.found_all_symbols():
+            self.loop_through_scanned_images(True,self.no_cnts_filter)
     
     # loops through all pages of a scanned template pdf
     def loop_through_scanned_images(self,all_cnts,no_cnts_filter):
@@ -106,20 +113,47 @@ class ReadTemplate:
     def perform_sym_extraction_run(self,img_name,all_cnts,no_cnts_filter):
         
         ## execute file reading steps
-        # read the image specifications of the outputted pdf template
-        self.read_image_specs() 
         # Load the (processed) image(s) from the input folder self.input_dir
         self.image, self.original,self.thresh = self.load_image(img_name)
-        # Apply morphing to image, don't know why necessary but it works
-        self.close,self.kernel = self.morph_image()
-        # Finds the contours which the code thinks contain qr codes
-        self.cnts = self.find_contours()
-        # Returns the regions of interest that actually contain qr codes
-        # ROI consists of 3 stacked blocks, on top the printed symbol, middle =written symbol,
-        # bottom is qr code
-        self.ROIs,self.ROIs_pos= self.loop_through_contours()
-        # read the qr codes from the ROIs and export the found handwritten symbols
-        self.read_qr_imgs(img_name)
+         
+        # decode entire page at once if no_cnts_filter
+        if (no_cnts_filter):
+            print(f'img_name={img_name}')
+            self.decode_complete_page()
+        else: # first select ROIs then find qr codes in those ROIs only
+            # Apply morphing to image, don't know why necessary but it works
+            self.close,self.kernel = self.morph_image() 
+            # Finds the contours which the code thinks contain qr codes
+            self.cnts = self.find_contours()
+            # Returns the regions of interest that actually contain qr codes
+            # ROI consists of 3 stacked blocks, on top the printed symbol, middle =written symbol,
+            # bottom is qr code
+            self.ROIs,self.ROIs_pos= self.loop_through_contours(all_cnts,no_cnts_filter)
+            # read the qr codes from the ROIs and export the found handwritten symbols
+            self.read_qr_imgs(img_name)
+        
+    # decodes complete page at once
+    def decode_complete_page(self):
+        # read qrs directly from entire page
+        qrcode = decode(self.image)
+        
+        # find list of qr code content
+        for i in range(0,len(qrcode)):
+            
+            # get the decoded text of the qr code
+            content = self.get_qr_content([qrcode[i]])# need to repack it as list
+        
+            # check if a missing qr code is found
+            missing_sym_indices = self.list_missing_symbols()
+            found_missing = self.list_contains_string(self.list_missing_symbols(), int(content))
+            if found_missing:
+                print(f'FOUND MISSING={content}')
+            
+            
+        qrcode = decode(self.thresh)
+        print(f'self.thresh qrcode={qrcode}')
+        
+        
         
     # clear the contour output folder 
     def clear_output_folder(self):
@@ -168,7 +202,7 @@ class ReadTemplate:
         return cnts
 
     # returns the region of interest (ROI) and ROI pixelwise corner coordinates in original image
-    def loop_through_contours(self):
+    def loop_through_contours(self,all_cnts,no_cnts_filter):
         ROIs = []
         ROIs_pos = []
         
@@ -180,18 +214,18 @@ class ReadTemplate:
             x,y,w,h = cv2.boundingRect(approx)
             area = cv2.contourArea(c)
             ar = w / float(h)
-            ROIs,ROIs_pos= self.select_qr_contours(approx,ar,area,h,w,x,y,ROIs,ROIs_pos)
+            ROIs,ROIs_pos= self.select_qr_contours(approx,ar,area,h,w,x,y,ROIs,ROIs_pos,all_cnts,no_cnts_filter)
         return ROIs,ROIs_pos
         
     # TODO: change len(approx) to a standardized value from qr code sizes
     # TODO: change area size to output of box size in symbol_spec.txt
     # TODO: change ar size to output of box size in symbol_spec.txt    
     # Selects the contours based on their geometrics vs symbol spec file outputed by template creation
-    def select_qr_contours(self,approx,ar,area,h,w,x,y,ROIs,ROIs_pos):
+    def select_qr_contours(self,approx,ar,area,h,w,x,y,ROIs,ROIs_pos,all_cnts,no_cnts_filter):
         
         # area is the nr of minimum pixels a ROI must have
         # ar is the aspect ratio (width/height)
-        if area > 100 and (ar > .25 and ar < 0.4):
+        if all_cnts or (area > 100 and (ar > .25 and ar < 0.4)):
             cv2.rectangle(self.image, (x, y), (x + w, y + h), (36,255,12), 3)
             ROI = self.original[y:y+h, x:x+w]
             
@@ -281,8 +315,9 @@ class ReadTemplate:
             if len(qrcode)>0:
                 
                 # get then encoded qr code content as decoded text
-                qr_content = self.get_qr_content(qrcode)
+                qr_content = self.get_qr_content(qrcode) 
             
+                # TODO: Check if there is only 1 qr code in ROI
                 # Get the qr coordinates relative to the contour:
                 left_qr_cont = qrcode[0].rect[0]
                 top_qr_cont = qrcode[0].rect[1]
@@ -380,6 +415,32 @@ class ReadTemplate:
         output.close()    
         
         return content
+    
+    def found_all_symbols(self):
+        if (len(self.list_missing_symbols())==0):
+            return True
+        return False
+     
+    # returns list of integers, containing missing symbol indices
+    def list_missing_symbols(self):
+        
+        missing_sym = []
+        
+        # find list of files in font directory
+        font_files = [f for f in listdir(self.font_dir) if isfile(join(self.font_dir, f))]
+        
+        # symbol index starts at one.
+        for i in range(1,int(self.nrOfSymbols)):
+            if not self.list_contains_string(font_files, f'{i}.png'):
+                missing_sym.append(i)
+        return missing_sym
+        
+    # returns true if any list element equals the string, false otherwise
+    def list_contains_string(self,lst, string):
+        for i in range(0,len(lst)):
+            if string == lst[i]:
+                return True
+        return False
         
 # executes this main code
 if __name__ == '__main__':
