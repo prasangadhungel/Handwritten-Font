@@ -9,6 +9,7 @@
 
 # pip install pdf2image
 #conda install -c conda-forge poppler
+import os, re, os.path
 import cv2
 import numpy as np
 import re
@@ -17,6 +18,10 @@ from io import StringIO ## for Python 3
 from pdf2image import convert_from_path
 from pyzbar.pyzbar import decode
 from PIL import Image
+
+import scipy.signal
+import numpy as np
+import matplotlib.pyplot as plt 
 
 class ReadTemplate:
     
@@ -40,33 +45,39 @@ class ReadTemplate:
         # hardcode relative qr specification file location
         self.spec_filename = 'symbol_spec.txt'
         self.spec_loc = f'../template_creating/{self.spec_filename}'
-        self.read_image_specs()
+        
         self.output_dir = "out"
         
-        # execute file reading steps
-        self.create_tempqr()
-        self.clear_output_folder()
-        self.convert_pdf_to_img()
+        # Directory with the scanned/photographed templates that are being analysed
+        self.input_dir = "in"
+        # directory to which the fonts are being exported
+        self.font_dir = 'font' 
+        self.overwrite = False # do not overwrite symbols that are already captured and exported
+        self.img_name = f'{self.input_dir}/p0.png'
+        
+        ## execute file reading steps
+        # read the image specifications of the outputted pdf template
+        self.read_image_specs() 
+        self.clear_output_folder() # clear the contour output folder (used for temporary manual inspection of code)
+        self.convert_pdf_to_img() # 
         self.image, self.original,self.thresh = self.load_image()
         self.close,self.kernel = self.morph_image()
         self.cnts = self.find_contours()
         self.ROIs,self.ROIs_pos= self.loop_through_contours()
         self.read_qr_imgs()
-        # self.()
+        
         
     def clear_output_folder(self):
-        import os, re, os.path
-        
         for root, dirs, files in os.walk(self.output_dir):
             for file in files:
                 os.remove(os.path.join(root, file))
         
     def convert_pdf_to_img(self):
         # first convert the pdf into separate images        
-        pages = convert_from_path('testfiles/filled.pdf', 500)
+        pages = convert_from_path(f'{self.input_dir}/filled.pdf', 500)
         count=0
         for page in pages:
-            page.save(f'testfiles/out{count}.jpg', 'JPEG')
+            page.save(f'{self.input_dir}/out{count}.jpg', 'JPEG')
             count = count+ 1
 
     # TODO: Scan the directory for a single pdf.
@@ -75,10 +86,12 @@ class ReadTemplate:
     # TODO: Loop through all qr codes
     # Load image, grayscale, Gaussian blur, Otsu's threshold
     def load_image(self):
-        image = cv2.imread('testfiles/scanned.jpg')
+        image = cv2.imread(self.img_name)
         original = image.copy()
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blur = cv2.GaussianBlur(gray, (9,9), 0)
+        #blur.save(f'out/blur.png')
+        cv2.imwrite(f'{self.output_dir}/blur.png', blur)
         thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
         return image,original,thresh
         
@@ -100,6 +113,7 @@ class ReadTemplate:
         ROIs_pos = []
         
         for c in self.cnts:
+            #if len(ROIs) <2: # for quick debugging on single succesfull qr code
             peri = cv2.arcLength(c, True)
             approx = cv2.approxPolyDP(c, 0.04 * peri, True) # number of sides of polygon?
             x,y,w,h = cv2.boundingRect(approx)
@@ -115,10 +129,9 @@ class ReadTemplate:
     def select_qr_contours(self,approx,ar,area,h,w,x,y,ROIs,ROIs_pos):
         # if len(approx) == 4 and area > 1000 and (ar > .85 and ar < 1.3):
         #if len(approx) == 3 and area > 1000:
-        if area > 100 and (ar > .3 and ar < 0.38):
+        if area > 100 and (ar > .25 and ar < 0.38):
             cv2.rectangle(self.image, (x, y), (x + w, y + h), (36,255,12), 3)
             ROI = self.original[y:y+h, x:x+w]
-            
             
             # left = qrcode[0].rect[0]
             # top = qrcode[0].rect[1]
@@ -131,6 +144,14 @@ class ReadTemplate:
             # convert images to grayscale
             ROI_gray = self.convert_img_to_grayscale(ROI)
             
+            # blur roi
+            #blur = cv2.GaussianBlur(ROI_gray, (25,25), 0)
+            #blur = cv2.GaussianBlur(ROI_gray, (3,3), 1)
+            blur = self.smoothen_img(ROI_gray)
+            
+            #thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+            ROI_gray = blur
+            
             # export images
             #cv2.imwrite(f'{self.output_dir}/ROI_{len(ROIs)}_ar_{ar}.png', ROI_gray)
             cv2.imwrite(f'{self.output_dir}/ROI_{len(ROIs)}.png', ROI_gray)
@@ -138,6 +159,26 @@ class ReadTemplate:
             ROIs_pos.append(ROI_pos)
         return ROIs,ROIs_pos
             
+    def smoothen_img(self,im):
+        # make some kind of kernel, there are many ways to do this...
+        t = 1 - np.abs(np.linspace(-1, 1, 21))
+        kernel = t.reshape(21, 1) * t.reshape(1, 21)
+        kernel /= kernel.sum()   # kernel should sum to 1!  :) 
+
+        # convolve 2d the kernel with each channel
+        print(f'im.shape={im.shape}')
+        im_out = scipy.signal.convolve2d(im, kernel, mode='same')
+        
+        # stack the channels back into a 8-bit colour depth image and plot it
+        # im_out = (im_out * 255).astype(np.uint8) 
+
+        # plt.subplot(2,1,1)
+        # plt.imshow(im)
+        # plt.subplot(2,1,2)
+        # plt.imshow(im_out)
+        # plt.show()
+        return im_out
+    
     # Shows relevant countours which are believed to contain qr code.
     def show_qr_images(ROI):
         cv2.imshow('thresh', thresh)
@@ -189,6 +230,10 @@ class ReadTemplate:
             print(f'nr of qr codes = {len(qrcode)}')
             
             if len(qrcode)>0:
+                
+                # get qr code content
+                qr_content = self.get_qr_content(qrcode)
+            
                 # Get the qr coordinates relative to the contour:
                 left_qr_cont = qrcode[0].rect[0]
                 top_qr_cont = qrcode[0].rect[1]
@@ -222,8 +267,8 @@ class ReadTemplate:
    
                 from matplotlib import pyplot as plt
                 #full_img=Image.open(f'{self.output_dir}/ROI_{i}.png')
-                #full_img = cv2.imread('testfiles/out3.jpg')
-                full_img=Image.open('testfiles/scanned.jpg')
+                #full_img = cv2.imread(f'{self.input_dir}/out3.jpg')
+                full_img=Image.open(self.img_name)
                 print(full_img.size)
                 
                 contour = full_img.crop((left_ct,top_ct,right_ct,bottom_ct))
@@ -235,8 +280,22 @@ class ReadTemplate:
                 im_crop.save(f'out/crop{i}.png')
                 
                 sym_crop = full_img.crop((left_sym,top_sym,right_sym,bottom_sym))
-                sym_crop.save(f'out/symbol_{i}.png')
+                sym_crop.save(f'out/symbol_{i}_{qr_content}.png')
                 
+                self.export_to_font(sym_crop,qr_content)
+    
+    # export font symbol
+    def export_to_font(self, img,symbol_nr):
+        # first create font output folder if it doesnt exist yet
+        if not os.path.exists(self.font_dir):
+            os.makedirs(self.font_dir)
+        
+        # Check if the symbol is already captured or should be overwritten
+        if self.overwrite or (not os.path.exists(f'{self.font_dir}/{symbol_nr}.png')):
+            
+            # export/store the handwritten symbol
+            img.save(f'{self.font_dir}/{symbol_nr}.png')
+            
     # Source of magic preprocessing settings: https://stackoverflow.com/questions/50080949/qr-code-detection-from-pyzbar-with-camera-image
     def preprocess_qrcode(self,image):
         # thresholds image to white in back then invert it to black in white
@@ -247,6 +306,14 @@ class ReadTemplate:
         qrcode = decode(inverted)
         print(f'qrcode={qrcode}')
         return qrcode
+        
+    def get_qr_content(self,qrcode):
+        print(f'qrcode[0].data={qrcode[0].data}')
+        content= str(qrcode[0].data)[2:]
+        print(f'content={content}')
+        content = content[:-1]
+        print(f'content={content}')
+        return content
             
     def show_qr(self,img,left,top,width,height):
         #im_crop = self.image.crop((tl[1], tl[0], tr[1], bl[0]))
@@ -281,16 +348,6 @@ class ReadTemplate:
         output.close()    
         
         return content
-    
-    def create_tempqr(self):
-        # importing the module
-        import qrcode 
-
-        # information
-        First_qrcode=qrcode.make(r'Includehelp is one of the best sites to learn any programming language from the basics. To visit the site click on the link:  https://www.includehelp.com .') 
-
-        # to see the QR code on the computer screen
-        print(f'First_qrcode={First_qrcode}')
         
 if __name__ == '__main__':
     main = ReadTemplate()
