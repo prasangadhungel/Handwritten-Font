@@ -1,20 +1,17 @@
 # Fontmaker
-Makes your own font.
+Makes your own font so you can create your own personal handwritten (latex) letters.
 
-**Dependencies**
+## Usage Instructions
+0. Print the pdf page with the qr codes from `/template_creating/main.pdf`
+1. Scan the pages (or take pics of them with your phone).
+2. Run the latest `/template_reading/readXX.py`.
+3. That should be it, now you have your font in `/showing_your_font/`. (TODO: call the python script that makes the font once all symbols are found and compile the latex example to show the font in a pdf.)
 
-* Opengl(GLUT, GL, GLU)
-* OpenCV(CV2)
-
-**Execution**
-
-`$ python3 main.py`
-
-and start typing.
-
-*How you can use your own font*
-
-Add your font images in the directory images/ and run the program.
-
-**Demo** <br />
-<iframe width="560" height="315" src="https://www.youtube.com/embed/d3TiCgGl-iQ" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+## Advanced Usage Instructions
+0. Fill the `/template_creating/symbols.txt` with the symbols that you want in your font.
+1. Compile the main.tex (you can just import this github to overleaf and press "compile"), or install Texmaker, open `main.tex` and press F6 F7.
+2. Print the handwriting templated called `main.pdf` file with the qr codes.
+3. Fill in the template and scan it.
+4. Put the scanned images or scanned pdf into the `template_reading/in/` folder.
+5. Create a python 3.6 environment in anaconda (see `readXX.py`) and run the latest `readXX.py` file.
+6. TODO: Scan the extracted font symbols and actually create the font.
