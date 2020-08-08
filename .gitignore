@@ -2,6 +2,9 @@
 *.dvi
 *.log
 *.synctex.gz
+*.bbl
+*.blg
+*.ps
 
 /examples/*
 /template_reading/testfiles/*

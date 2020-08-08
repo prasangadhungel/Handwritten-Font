@@ -75,7 +75,7 @@ class ReadTemplate:
     # TODO: Loop through all qr codes
     # Load image, grayscale, Gaussian blur, Otsu's threshold
     def load_image(self):
-        image = cv2.imread('testfiles/out3.jpg')
+        image = cv2.imread('testfiles/scanned.jpg')
         original = image.copy()
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blur = cv2.GaussianBlur(gray, (9,9), 0)
@@ -115,7 +115,7 @@ class ReadTemplate:
     def select_qr_contours(self,approx,ar,area,h,w,x,y,ROIs,ROIs_pos):
         # if len(approx) == 4 and area > 1000 and (ar > .85 and ar < 1.3):
         #if len(approx) == 3 and area > 1000:
-        if area > 10000 and (ar > .3 and ar < 0.38):
+        if area > 100 and (ar > .3 and ar < 0.38):
             cv2.rectangle(self.image, (x, y), (x + w, y + h), (36,255,12), 3)
             ROI = self.original[y:y+h, x:x+w]
             
@@ -223,7 +223,7 @@ class ReadTemplate:
                 from matplotlib import pyplot as plt
                 #full_img=Image.open(f'{self.output_dir}/ROI_{i}.png')
                 #full_img = cv2.imread('testfiles/out3.jpg')
-                full_img=Image.open('testfiles/out3.jpg')
+                full_img=Image.open('testfiles/scanned.jpg')
                 print(full_img.size)
                 
                 contour = full_img.crop((left_ct,top_ct,right_ct,bottom_ct))

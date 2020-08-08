@@ -61,43 +61,60 @@
 \newcounter{symIndex}
 \setcounter{symIndex}{0}%
 
+% set a qr counter
+\newcounter{qrIndex}
+\setcounter{qrIndex}{0}%
+
 %loop through lines
 %\newpage
 \hspace{-1.7em} % SHift top row left to prevent some section indentation
+
+% loop through the nr of lines vertically
 \noindent\forloop{ct4}{0}{\value{ct4} < \missingcommand{nrOfLinesPerPage}}{
 
-% loop through columns
-\begin{tikzpicture}[scale=2][H]
-    \tikzstyle{ann} = [draw=none,fill=none,right]
-    \matrix[nodes={draw, ultra thin, fill=white},
-        %row sep=-\missingcommand{boxWidth}*0.09em,column
-        row sep=-3pt,column sep=-\missingcommand{boxWidth}*0.0mm] {
-    % \hspace{-14em}   
-        % create square with symbol in it.
-        \forloop{ct1}{0}{\value{ct1} < \missingcommand{nrOfBoxesPerLine}}{  
-        
-        % increase the symbol count index by one
-        \addtocounter{symIndex}{1}
-         
-        \node[rectangle,minimum height=\missingcommand{boxWidth}mm,minimum width=\missingcommand{boxWidth}mm]
-        {.\missingcommand{\the\value{symIndex}}}; \pgfmatrixnextcell
-        }\\
-        
-        % \hspace{-14em}
-        % create empty square
-        \forloop{ct2}{0}{\value{ct2} < \missingcommand{nrOfBoxesPerLine}}{
-        \node[rectangle,minimum height=\missingcommand{boxWidth}mm,minimum width=\missingcommand{boxWidth}mm] {}; \pgfmatrixnextcell
-        }\\
-        
-        % \hspace{-14em}
-        % Create qr Codes
-        \forloop{ct3}{0}{\value{ct3} < \missingcommand{nrOfBoxesPerLineMinOne}}{
-        \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}mm]{\the\value{symIndex}} }; \pgfmatrixnextcell
-        }
-        
-        % \hspace{-14em}
-        % manually print last qr code to close without \pgfmatrixnextcell
-        \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}mm]{\the\value{symIndex}} };\\
-    };
-\end{tikzpicture}
+
+    \begin{tikzpicture}[scale=2][H]
+        \tikzstyle{ann} = [draw=none,fill=none,right]
+        \matrix[nodes={draw, ultra thin, fill=white},
+            %row sep=-\missingcommand{boxWidth}*0.09em,column
+            row sep=-3pt,column sep=-\missingcommand{boxWidth}*0.0mm]{
+            
+            % loop through the horizontal boxes per line
+            \forloop{ct1}{0}{\value{ct1} < \missingcommand{nrOfBoxesPerLine}}{  
+            
+                % increase the symbol count index by one
+                \addtocounter{symIndex}{1}
+                 
+                % create square with symbol in it.
+                \node[rectangle,minimum height=\missingcommand{boxWidth}mm,minimum width=\missingcommand{boxWidth}mm]
+                {.\missingcommand{\the\value{symIndex}}}; \pgfmatrixnextcell
+                }\\
+                
+                % \hspace{-14em}
+                % create empty square
+                \forloop{ct2}{0}{\value{ct2} < \missingcommand{nrOfBoxesPerLine}}{
+                    
+                    \node[rectangle,minimum height=\missingcommand{boxWidth}mm,minimum width=\missingcommand{boxWidth}mm] {}; \pgfmatrixnextcell
+                
+                }\\
+                
+                
+                % \hspace{-14em}
+                % Create qr Codes by looping through the horizontal boxes
+                \forloop{ct3}{0}{\value{ct3} < \missingcommand{nrOfBoxesPerLineMinOne}}{
+                    
+                    % increase the qr count index by one
+                    \addtocounter{qrIndex}{1}
+                
+                    \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}mm]{\the\value{qrIndex}} }; \pgfmatrixnextcell
+                }
+                
+                % increase the symbol count index by one
+                \addtocounter{qrIndex}{1}
+                
+                % \hspace{-14em}
+                % manually print last qr code to close without \pgfmatrixnextcell
+                \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}mm]{\the\value{qrIndex}} };\\
+            }; % close loop through horizontal boxes
+    \end{tikzpicture}
 } % close loop through lines
