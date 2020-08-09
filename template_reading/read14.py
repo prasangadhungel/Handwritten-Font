@@ -469,26 +469,82 @@ class ReadTemplate:
         qr = QrCode(11,1,2,3,4,100,9)
         pass
         
+    # returns true if each row has contains a qr code that is found. Rows and columns start at 1
     def isQrcodeOnEachRow(self,qrcodes):
         # create a checklist with element for each row
         checklist = [False] * self.nrOfLinesPerPage
-        
-        # loop through rows
-        for i in range(0,len(checklist)):
+        # loop through rows (rows start at 1)
+        for i in range(1,len(checklist)+1):
             # loop through qr codes till a qr is found on the row under evaluation
             for j in range(0,len(qrcodes)): 
                 # inspect if the row of the qr code is equal to row under evaluation
                 if qrcodes[j].row == i:
                     # set checklist item for that row to true if qr is in that row
-                    checklist[i]=True
+                    checklist[i-1]=True #(rows start at 1 but lists don't so -1)
                     # skip the remainder of the qr codes since requirement is satisfied
-                    i = len(checklist)+1 
+                    j = len(checklist)+1 
         # check if all rows contain a qr code.
         if all(element for element in checklist):
             return True
         # Return false if not every row has a qr code
         return False
     
+    def has_quarter_spacing(self,qrcodes,dist_frac=0.25):
+        # loop through rows
+        for row in range(1,self.nrOfLinesPerPage):
+            rowList = []
+            most_left_col_per_row = None
+            most_right_col_per_row = None
+            # loop through qr codes
+            for i in range(0,len(qrcodes)):
+                # if qr in row, 
+                if qrcodes[i].row==row:  
+                    #add qr to list of that row
+                    rowList.append(i)
+                    # update most left qr position for that row
+                    most_left_col_per_row = self.get_most_left_column_per_row(most_left_col_per_row,qrcodes[i])
+                    # update most right qr position for that row
+                    most_right_col_per_row = self.get_most_right_column_per_row(most_right_col_per_row,qrcodes[i])
+            # check if distance is at least quarter of nr of lines per box
+            if self.check_hori_dist(most_left_col_per_row,most_right_col_per_row,dist_frac):
+                return True
+        return False
+    
+    # returns the most left column number of the qr code that is found in a row
+    def get_most_left_column_per_row(self,most_left,qrcode):
+        if most_left==None:
+            return qrcode.column
+        else:
+            if most_left>qrcode.column:
+                return qrcode.column
+            else:
+                return most_left
+    
+    # returns the most right column number of the qr code that is found in a row
+    def get_most_right_column_per_row(self,most_right,qrcode):
+        if most_right==None:
+            return qrcode.column
+        else:
+            if most_right<qrcode.column:
+                return qrcode.column
+            else:
+                return most_right
+ 
+    # returns true if the distance between the codes on a line is larger than the given fraction of the nr of boxes of that line
+    def check_hori_dist(self,left,right,fraction):
+        if (not left==None) and (not right==None):
+            # print(f'found={(right-left-1)/self.nrOfBoxesPerLine}')
+            # print(f'margin={fraction}')
+            if (right-left-1)/self.nrOfBoxesPerLine>=fraction:
+                return True
+        return False
+ 
+    def avg_qr_width_per_row(self,qrcodes):
+        widths = [False] * len(qrcodes)
+        for i in range(0,len(qrcodes)):
+            widths[i]=qrcodes[i].width
+        return int(sum(widths) / len(widths))
+ 
     # test unit tests
     def addThree(self,x):
         return x+3
