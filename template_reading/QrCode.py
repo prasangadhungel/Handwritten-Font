@@ -18,7 +18,17 @@ class QrCode:
         self.row = self.get_qr_row()
         self.column = self.get_qr_column()
         self.page_nr = self.get_page_nr()
+        self.hashcode = self.__hash__()
         
+    def __hash__(self):
+        return hash(('top', self.top,
+                     'left', self.left,
+                     'width', self.width,
+                     'height', self.height,
+                     'index', self.index
+                     ))
+                 
+                 
     # returns page nr starting at 1
     def get_page_nr(self):
         return math.floor(self.index/(self.nrOfBoxesPerLine*self.nrOfLinesPerPage))+1 

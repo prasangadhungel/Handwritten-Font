@@ -146,7 +146,7 @@ class TestStringMethods(unittest.TestCase):
         qrcodes = [qr_one,qr_two,qr_three]
         self.assertFalse(self.read.has_quarter_spacing(qrcodes))
     
-    # tests if the most right qr code is identified correclty
+        # tests if the most right qr code is identified correclty
     def test_has_quarter_spacing_false_but_close(self):
         self.read.nrOfBoxesPerLine = 9
         self.read.nrOfLinesPerPage = 3
@@ -180,6 +180,31 @@ class TestStringMethods(unittest.TestCase):
         qr_three = QrCode(7,1,2,width_three,4,self.read.nrOfSymbols,self.read.nrOfBoxesPerLine,self.read.nrOfLinesPerPage)
         qrcodes = [qr_one,qr_two,qr_three]
         self.assertEqual(int(35/3),self.read.avg_qr_width_per_row(qrcodes))
+        self.assertNotEqual(int(32/3),self.read.avg_qr_width_per_row(qrcodes))
+    
+    def test_identify_unknown_qrcodes_in_row(self):
+        self.read.nrOfBoxesPerLine = 9
+        self.read.nrOfLinesPerPage = 3
+        self.read.nrOfSymbols = 100
+        qr_one = QrCode(3,1,2,3,4,self.read.nrOfSymbols,self.read.nrOfBoxesPerLine,self.read.nrOfLinesPerPage)
+        qr_two = QrCode(5,1,2,3,4,self.read.nrOfSymbols,self.read.nrOfBoxesPerLine,self.read.nrOfLinesPerPage)
+        qr_three = QrCode(7,1,2,3,4,self.read.nrOfSymbols,self.read.nrOfBoxesPerLine,self.read.nrOfLinesPerPage)
+        qrcodes = [qr_one,qr_two,qr_three]
+        result = self.read.identify_unknown_qrcodes_in_row(1,qrcodes)
+        expected = [1,2,4,6,8,9]
+        self.assertEqual(expected,result)
+        
+    def test_identify_unknown_qrcodes_in_row_next_page(self):
+        self.read.nrOfBoxesPerLine = 9
+        self.read.nrOfLinesPerPage = 3
+        self.read.nrOfSymbols = 100
+        qr_one = QrCode(38,1,2,3,4,self.read.nrOfSymbols,self.read.nrOfBoxesPerLine,self.read.nrOfLinesPerPage)
+        qr_two = QrCode(43,1,2,3,4,self.read.nrOfSymbols,self.read.nrOfBoxesPerLine,self.read.nrOfLinesPerPage)
+        
+        qrcodes = [qr_one,qr_two]
+        result = self.read.identify_unknown_qrcodes_in_row(2,qrcodes)
+        expected = [37,39,40,41,42,44,45]
+        self.assertEqual(expected,result)
     
 if __name__ == '__main__':
     unittest.main()
