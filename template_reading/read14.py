@@ -89,7 +89,9 @@ class ReadTemplate:
         self.convert_pdf_to_img(self.input_dir,self.scanned_pdf_name)
         
         ## clear the contour output folder 
-        self.clear_output_folder() 
+        self.clear_folder(self.output_dir) 
+        ## clear the font output folder 
+        self.clear_folder('font') 
         
         ## perform run on all images, scanning an entire page at once
         self.loop_through_scanned_images(self.all_cnts,True)
@@ -132,8 +134,9 @@ class ReadTemplate:
             print(f'img_name={img_name}')
             merged_qrcodes = self.decode_complete_page(img_name)
             
-            # perform geometric inference
-            self.geometric_inference(img_name,merged_qrcodes) 
+            if len(merged_qrcodes)>0:
+                # perform geometric inference
+                self.geometric_inference(img_name,merged_qrcodes) 
             
         else: # first select ROIs then find qr codes in those ROIs only
             # Apply morphing to image, don't know why necessary but it works
@@ -205,8 +208,8 @@ class ReadTemplate:
                 
         
     # clear the contour output folder 
-    def clear_output_folder(self):
-        for root, dirs, files in os.walk(self.output_dir):
+    def clear_folder(self,folder):
+        for root, dirs, files in os.walk(folder):
             for file in files:
                 os.remove(os.path.join(root, file))
         
@@ -389,7 +392,7 @@ class ReadTemplate:
         # trim parameters for the edges of the symbol square to remove black borders of 
         # the square around the handwritten symbol (space)
         vert_focus_margin = 0.95
-        hori_focus_margin = 0.94
+        hori_focus_margin = 0.84
         
         # compute handwritten symbol position wrt original image
         top_sym = top_qr-height_qr_cont*vert_focus_margin
@@ -636,7 +639,7 @@ class ReadTemplate:
         
     # extracts the remaining symbols that aren't found by combining the assumed geometry data (layout) with the measured geometry data(measurements)
     def geometric_inference(self,img_name,qrcodes):    
-        for row_nr in range(1,self.nrOfLinesPerPage):
+        for row_nr in range(1,self.nrOfLinesPerPage+1):
             missing_qrcodes_indices_in_row = self.identify_unknown_qrcodes_in_row(row_nr,qrcodes)
             if len(missing_qrcodes_indices_in_row)>0:
                 page_nr_of_img = qrcodes[0].page_nr
@@ -646,10 +649,45 @@ class ReadTemplate:
                         geometry_data = self.get_geometry_data(row_nr,page_nr_of_img,qrcodes)
                         self.extract_missing_symbols_in_line(img_name,row_nr,geometry_data,missing_qrcodes_indices_in_row,qrcodes)
                     else:
+                        nearest_row_with_spacing = self.get_nearest_row_with_spacing(page_nr_of_img,qrcodes,row_nr)
                         print('NEED THE GEOMETRIC UPDATE FROM THE OTHER ROW AS A REFERENCE TO DO GEOMETRIC INFERENCE. That has not yet been implemented though.')
+                        if not nearest_row_with_spacing is None:
+                            geometry_data = self.get_geometry_data(nearest_row_with_spacing,page_nr_of_img,qrcodes)
+                            print(f'before geometry_data[3]=top={geometry_data[3]}, and geometry_data[4]=bottom={geometry_data[4]}')
+                            
+                            updated_geometry_data = self.update_geometry(geometry_data,row_nr,nearest_row_with_spacing,qrcodes)
+                            print(f'nearest_row_with_spacing={nearest_row_with_spacing}')
+                            
+                            print(f'after geometry_data[3]=top={geometry_data[3]}, and geometry_data[4]=bottom={geometry_data[4]}')
+                            print(f'updated_geometry_data[3]=top={updated_geometry_data[3]}, and updated_geometry_data[4]=bottom={updated_geometry_data[4]}')
+                            
+                            
+                            qrcodes_of_nearest_row = self.get_found_qrcodes_in_row(nearest_row_with_spacing,qrcodes)
+                            print(f'qrcodes_of_nearest_row={qrcodes_of_nearest_row}')
+                            
+                            missing_qr_codes_indices_in_nearest_row = self.identify_unknown_qrcodes_in_row(nearest_row_with_spacing,qrcodes)
+                            
+                            # doubt qrcodes_of_nearest_row or found_qrcodes?
+                            self.extract_missing_symbols_in_empty_line(img_name,row_nr,geometry_data,missing_qr_codes_indices_in_nearest_row,qrcodes,updated_geometry_data,qrcodes_of_nearest_row,nearest_row_with_spacing)
+                            
                        #self.use_closest_row_with_distance_frac_for_extraction()
                 else:
                     return print(f'NEED MORE IMAGES CANT DO GEOMETRIC INFERENCE.')
+    
+    def get_nearest_row_with_spacing(self,page_nr_of_img,qrcodes,row_nr):
+        start_row = 1
+        end_row = self.nrOfLinesPerPage
+        for distance in range(start_row,end_row):
+            for x in [-1,1]:
+                next_row_nr = row_nr+distance*x
+                if (next_row_nr  <= end_row) and (next_row_nr >= start_row):
+                    if self.has_quarter_spacing(page_nr_of_img,qrcodes,next_row_nr):
+                        return next_row_nr
+        # TODO: Throw exception that it could not perform complete geometric inference and need more/better data/images
+                    
+        
+        
+        
     
     # returns the average spacing between the qr codes in a specific row
     def get_avg_spacing_between_qrcodes(self,row_nr,qrcodes_in_row,page_nr_of_img,avg_width_in_row):
@@ -709,9 +747,107 @@ class ReadTemplate:
         return found_qr_codes_on_row
             
             
-    def update_geometry(self,original_row,closest_row):
-        print(f'SHOULD DO UPDATING OF GEOMETRY WRT ACTUAL ROW!')
+    # returns the geometry data from the nearest row that has the quarter distance fraction
+    # with the top and bottom shifted to the qr in the row that is being geometrically inferenced.
+    # (because that row didn't have the quarter distance fraction/enough geometry data)
+    def update_geometry(self,geometry_data,original_row,nearest_row,qrcodes):
+        updated_geometry_data = geometry_data.copy()
+        print(f'original_row={original_row} and qrcodes ={list(map(lambda x: x.index,qrcodes))}')
+        original_row_qr_codes =  self.get_found_qrcodes_in_row(original_row,qrcodes)
+        if len(original_row_qr_codes)==0:
+            reference_row = self.get_reference_row(nearest_row,qrcodes)
+            
+            updated_geometry_data[3],updated_geometry_data[4] = self.get_interpolate_top_and_bottom(original_row,nearest_row,reference_row,qrcodes)
+            print(f'updated_geometry_data[3]=top={updated_geometry_data[3]}, and updated_geometry_data[4]=bottom={updated_geometry_data[4]}')
+            print(f'reference_row={reference_row} and original_row = {original_row}\n\n')
+        else:
+            updated_geometry_data[3] = round(mean(list(map(lambda x: x.top,original_row_qr_codes))),0) #3
+            updated_geometry_data[4] = round(mean(list(map(lambda x: x.bottom,original_row_qr_codes))),0) #3
+        return updated_geometry_data
+
+    # original row is the row that you are trying to infer (of which you are interpolating the positions of the
+    # symbol boxes. In this case no qr codes are found in the original row.
+    # nearest row is the nearest row that has a 25% fraction of the line with between at least 2 found qr code boxes.
+    # reference row is a row that contains at least 1 detected qr code, whilst not being the original row nor nearest row.
+    # This method uses the top positions of the original and nearest row to inter/extrapolate the position of the original row
+    # and returns this position (in pixels wrt the top of the original image).
+    def get_interpolate_top_and_bottom(self,original_row,nearest_row,reference_row,qrcodes):
+        # verify input data is valid for interpolation
+        self.check_interpolation_options(original_row,nearest_row,reference_row)
         
+        # compute distance in qr codes between nearest and reference row
+        # nr_lines_between_ref_min_nearest = reference_row-nearest_row #2=3-1 #c-a _boxes
+        # nr_lines_between_ref_min_originial = reference_row-original_row #1=3-2  #c-b _boxes
+        # nr_lines_between_originial_min_nearest = original_row-nearest_row #b-a _boxes
+        
+        # print(f'nr_lines_between_ref_min_nearest={nr_lines_between_ref_min_nearest},  nearest_row={nearest_row}')
+        # print(f'nr_lines_between_ref_min_originial={nr_lines_between_ref_min_originial},  original_row={original_row}')
+        # print(f'nr_lines_between_originial_min_nearest={nr_lines_between_originial_min_nearest},  reference_row={reference_row}')
+        
+        
+        # get the qrcodes of the nearest and reference rows 
+        qrcodes_nearest_row = self.get_found_qrcodes_in_row(nearest_row,qrcodes)
+        qrcodes_reference_row = self.get_found_qrcodes_in_row(reference_row,qrcodes)
+        
+        print(f'nearest_row={nearest_row} and len(qrcodes_nearest_row)={len(qrcodes_nearest_row)}')
+        print(f'reference_row={reference_row} and len(qrcodes_nearest_row)={len(qrcodes_reference_row)}')
+        
+        # compute the avg top position of the qr code of the nearest and reference rows
+        top_nearest_row = round(mean(list(map(lambda x: x.top,qrcodes_nearest_row))),0) # a _pixels
+        top_reference_row = round(mean(list(map(lambda x: x.top,qrcodes_reference_row))),0) # c_pixels
+        print(f'top_nearest_row={top_nearest_row}')
+        print(f'top_reference_row={top_reference_row}')
+        
+        
+        # compute the avg bottom position of the qr code of the nearest and reference rows
+        bottom_nearest_row = round(mean(list(map(lambda x: x.bottom,qrcodes_nearest_row))),0) # a _pixels
+        bottom_reference_row = round(mean(list(map(lambda x: x.bottom,qrcodes_reference_row))),0) # c_pixels
+        
+        print(f'bottom_nearest_row={bottom_nearest_row}')
+        print(f'bottom_reference_row={bottom_reference_row}')
+        
+        
+        # Compute the measured distance between the top of the nearest and reference row
+        top_ref_min_nearest = top_nearest_row-top_reference_row #c-a _pixels
+        bottom_ref_min_nearest = bottom_nearest_row-bottom_reference_row #c-a _pixels
+        print(f'top_ref_min_nearest={top_ref_min_nearest}')
+        
+        # Interpolate the difference between the top of the nearest row and original row (in pixels)
+        # a is nearest row
+        # b = original row
+        # c = reference row
+        #a_pixels+(c-a)_pixels*(b-a)_boxes/(c-a)_boxes
+        top_original = top_nearest_row+(top_reference_row-top_nearest_row)*(original_row-nearest_row)/(reference_row-nearest_row)
+        bottom_original = bottom_nearest_row+(bottom_reference_row-bottom_nearest_row)*(original_row-nearest_row)/(reference_row-nearest_row)
+        print(f'top_original={top_original}')
+        print(f'bottom_original={bottom_original}')
+        
+        return top_original,bottom_original
+        
+    # checks if interpolation is possible with incoming data. Throws errors if interpolation is not possible.    
+    def check_interpolation_options(self,original_row,nearest_row,reference_row):
+        if original_row == nearest_row:
+            raise ValueError('The original row should not contain any qr codes and should not be equal to the nearest row (which has 2 qr codes with quarter spacing, but original row is equal to nearest row )')
+        if original_row == reference_row:
+            raise ValueError('No interpolation would be required if the original row would be the reference row because the reference row should contain a qr code and the original row not. But the original row is equal to the reference row here.')
+        if reference_row == nearest_row:
+            raise ValueError('the nearest row and reference row should be different for them to be usable in interpolation, but they are not.')
+
+    def get_reference_row(self,nearest_row,qrcodes):
+        start_row = 1
+        end_row = self.nrOfLinesPerPage
+        print(f'end_row={end_row}\n\n\n')
+        max_distance = 0
+        max_distance_row = None
+        for distance in range(start_row,end_row):
+            for x in [-1,1]:
+                next_row_nr = nearest_row+distance*x
+                if (next_row_nr  <= end_row) and (next_row_nr >= start_row):
+                    if distance>max_distance:
+                        max_distance = distance
+                        max_distance_row = next_row_nr
+        return next_row_nr
+                        
     # computes the geometry of qrcodes in a specific row on a specific page and returns it as list
     def get_geometry_data(self,row_nr,page_nr_of_img,qrcodes):
         qrcodes_in_row = self.get_found_qrcodes_in_row(row_nr,qrcodes) #0 
@@ -744,7 +880,68 @@ class ReadTemplate:
             
             # export symbol to font directory
             self.get_symbol(full_img,missing_qrcode.index,missing_qrcode.top,missing_qrcode.left,missing_qrcode.bottom,missing_qrcode.right,missing_qrcode.width,missing_qrcode.height)
+    
+    def extract_missing_symbols_in_empty_line(self,img_name,original_row_nr,geometry_data,missing_qrcodes_indices_in_row,detected_qrcodes,updated_geometry_data,qrcodes_of_nearest_row,nearest_row_with_spacing):
+        #found_qrcodes_in_row = geometry_data[0]
         
+        missing_qrcodes = []
+        for i in range(0,len(missing_qrcodes_indices_in_row)):
+            # create filler for empty row
+            missing_qrcode_filler = QrCode(missing_qrcodes_indices_in_row[i],1,2,3,4,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesPerPage)
+            
+            print(f'missing_qrcodes_indices_in_row={missing_qrcodes_indices_in_row} and qrcodes_of_nearest_row ={qrcodes_of_nearest_row}')
+            #get the missing qr codes of the nearest row
+            nearest_qrcode, nr_of_qrcodes_inbetween = self.find_nearest_found_qrcode(missing_qrcode_filler,qrcodes_of_nearest_row)
+            missing_qrcode_filler.top = geometry_data[3]
+            missing_qrcode_filler.bottom = geometry_data[4]
+            missing_qrcode_filler.width = geometry_data[1]
+            missing_qrcode_filler.height = geometry_data[2]
+            
+            ## compute the left of all missing qr codes
+            missing_qrcode_filler.left = self.get_left_pos_of_missing_qrcode(missing_qrcode_filler.column,nearest_qrcode,geometry_data)
+            
+            missing_qrcode = QrCode(missing_qrcodes_indices_in_row[i],missing_qrcode_filler.top,missing_qrcode_filler.left,missing_qrcode_filler.width,missing_qrcode_filler.height,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesPerPage)
+            missing_qrcodes.append(missing_qrcode)
+            
+            ## overide the top and bottom settings of the concatenated list using updated_geometry_data
+            missing_qrcode.top = updated_geometry_data[3]
+            missing_qrcode.bottom = updated_geometry_data[4]
+        
+        ## concatenate list of found qr codes of nearest row with missing qr codes of nearest row
+        merged_nearest_row_qrcodes = missing_qrcodes+qrcodes_of_nearest_row
+        
+        # update the top and bottom of the original found qr codes in the missing row.
+        for i in range(0,len(merged_nearest_row_qrcodes)):
+            if merged_nearest_row_qrcodes[i] in qrcodes_of_nearest_row:
+                merged_nearest_row_qrcodes[i].top = missing_qrcode.top
+                merged_nearest_row_qrcodes[i].bottom = missing_qrcode.bottom
+                
+            # update the indices of the missing rows from nearest to original empty row indices
+            #print(f'original_row_nr={original_row_nr}')
+            #print(f'missing_qrcodes_indices_in_row={missing_qrcodes_indices_in_row}')
+            #merged_nearest_row_qrcodes[i].index= missing_qrcodes_indices_in_row
+            #print(f'nearest_row_with_spacing={nearest_row_with_spacing}')
+            merged_nearest_row_qrcodes[i].index = merged_nearest_row_qrcodes[i].index+(original_row_nr-nearest_row_with_spacing)*self.nrOfBoxesPerLine
+            #missing_qrcodes_indices_in_row[i]
+            print(f'merged_nearest_row_qrcodes[i].index={merged_nearest_row_qrcodes[i].index} and i = {i}')
+        
+        
+        print(f'missing_qrcode.index={list(map(lambda x: x.index,merged_nearest_row_qrcodes))}')
+        print(f'missing_qrcode.top={list(map(lambda x: x.top,merged_nearest_row_qrcodes))}')
+        print(f'missing_qrcode.bottom={list(map(lambda x: x.bottom,merged_nearest_row_qrcodes))}')
+        print(f'missing_qrcode.right={list(map(lambda x: x.right,merged_nearest_row_qrcodes))}')
+        print(f'missing_qrcode.left={list(map(lambda x: x.left,merged_nearest_row_qrcodes))}')
+        
+        #print(f'missing_qrcode.width,missing_qrcode.height={merged_nearest_row_qrcodes.width} and {merged_nearest_row_qrcodes.height}')
+        
+        # reload full image
+        full_img=Image.open(img_name)
+        
+        # export symbol to font directory
+        for i in range(0,len(merged_nearest_row_qrcodes)):
+            self.get_symbol(full_img,merged_nearest_row_qrcodes[i].index,merged_nearest_row_qrcodes[i].top,merged_nearest_row_qrcodes[i].left,merged_nearest_row_qrcodes[i].bottom,merged_nearest_row_qrcodes[i].right,merged_nearest_row_qrcodes[i].width,merged_nearest_row_qrcodes[i].height)
+
+    
     
     # returns the left position of the missing qr code
     def get_left_pos_of_missing_qrcode(self,column_missing_qrcode,nearest_qrcode,geometry_data):
@@ -817,14 +1014,7 @@ class ReadTemplate:
             return closest_left_qr    
         
     def get_symbol_coords_of_qr_code(self,row_nr, column_index,geometry_data):
-        return top,left,right,bottom
-        
-    # def use_closest_row_with_distance_frac_for_extraction():
-        # closest_row = find closest line that has 25% fraction
-        # geometry_data = self.get_geometry_data(self,closest_row)
-        # updated_geometry_data = update_geometry()
-        # self.extract_missing_symbols_in_line(img_name,row_nr,updated_geometry_data,missing_qrcodes)
-        
+        return top,left,right,bottom    
         
         
         
