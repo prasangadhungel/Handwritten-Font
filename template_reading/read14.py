@@ -167,7 +167,7 @@ class ReadTemplate:
         # return merged qrcodes with dupes removed
         #return list(set(qrcode_original+qrcode_thresholded)) 
         merged_list = qrcode_original+qrcode_thresholded
-        print(f'merged_list={merged_list}')
+        
         seen = []
         unique_list =[]
         for obj in merged_list:
@@ -175,7 +175,6 @@ class ReadTemplate:
                 seen.append(obj.hashcode)
                 unique_list.append(obj)
             
-        print(f'unique_list={unique_list}')
         return unique_list
         
         
@@ -588,8 +587,6 @@ class ReadTemplate:
     # returns true if the distance between the codes on a line is larger than the given fraction of the nr of boxes of that line
     def check_hori_dist(self,left,right,fraction):
         if (not left==None) and (not right==None):
-            # print(f'found={(right-left-1)/self.nrOfBoxesPerLine}')
-            # print(f'margin={fraction}')
             if (right-left-1)/self.nrOfBoxesPerLine>=fraction:
                 return True
         return False
@@ -709,7 +706,7 @@ class ReadTemplate:
     # returns the qr codes in a specific row, from a set of qr codes in a single page
     def get_found_qrcodes_in_row(self,row_nr,qrcodes):
         found_qrcodes_index = self.get_qrcode_indices_in_row(row_nr,qrcodes)
-        print(f'found_qrcodes_index={found_qrcodes_index},with qrcodes={list(map(lambda x: x.index,qrcodes))}\n\n\n')
+        print(f'found_qrcodes_index={found_qrcodes_index},with qrcodes={list(map(lambda x: x.index,qrcodes))}\n')
         found_qrcodes = []
         for i in range(0,len(found_qrcodes_index)):
             for j in range(0,len(qrcodes)):
@@ -805,7 +802,7 @@ class ReadTemplate:
     def get_reference_row(self,nearest_row,qrcodes):
         start_row = 1
         end_row = self.nrOfLinesPerPage
-        print(f'end_row={end_row}\n\n\n')
+        
         max_distance = 0
         max_distance_row = None
         for distance in range(start_row,end_row):
@@ -820,7 +817,7 @@ class ReadTemplate:
     # computes the geometry of qrcodes in a specific row on a specific page and returns it as list
     def get_geometry_data(self,row_nr,page_nr_of_img,qrcodes):
         qrcodes_in_row = self.get_found_qrcodes_in_row(row_nr,qrcodes) #0 
-        print(f'row_nr={row_nr},page_nr={page_nr_of_img},qrcodes_in_row={qrcodes_in_row}')
+        
         avg_width_in_row = round(mean(list(map(lambda x: x.width,qrcodes_in_row))),0) #1
         avg_height_in_row = round(mean(list(map(lambda x: x.height,qrcodes_in_row))),0) #2
         avg_top_in_row = round(mean(list(map(lambda x: x.top,qrcodes_in_row))),0) #3
@@ -858,7 +855,6 @@ class ReadTemplate:
             # create filler for empty row
             missing_qrcode_filler = QrCode(missing_qrcodes_indices_in_row[i],1,2,3,4,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesPerPage)
             
-            print(f'missing_qrcodes_indices_in_row={missing_qrcodes_indices_in_row} and qrcodes_of_nearest_row ={qrcodes_of_nearest_row}')
             #get the missing qr codes of the nearest row
             nearest_qrcode, nr_of_qrcodes_inbetween = self.find_nearest_found_qrcode(missing_qrcode_filler,qrcodes_of_nearest_row)
             missing_qrcode_filler.top = geometry_data[3]
@@ -886,30 +882,14 @@ class ReadTemplate:
                 merged_nearest_row_qrcodes[i].bottom = missing_qrcode.bottom
                 
             # update the indices of the missing rows from nearest to original empty row indices
-            #print(f'original_row_nr={original_row_nr}')
-            #print(f'missing_qrcodes_indices_in_row={missing_qrcodes_indices_in_row}')
-            #merged_nearest_row_qrcodes[i].index= missing_qrcodes_indices_in_row
-            #print(f'nearest_row_with_spacing={nearest_row_with_spacing}')
             merged_nearest_row_qrcodes[i].index = merged_nearest_row_qrcodes[i].index+(original_row_nr-nearest_row_with_spacing)*self.nrOfBoxesPerLine
-            #missing_qrcodes_indices_in_row[i]
-            print(f'merged_nearest_row_qrcodes[i].index={merged_nearest_row_qrcodes[i].index} and i = {i}')
-        
-        
-        print(f'missing_qrcode.index={list(map(lambda x: x.index,merged_nearest_row_qrcodes))}')
-        print(f'missing_qrcode.top={list(map(lambda x: x.top,merged_nearest_row_qrcodes))}')
-        print(f'missing_qrcode.bottom={list(map(lambda x: x.bottom,merged_nearest_row_qrcodes))}')
-        print(f'missing_qrcode.right={list(map(lambda x: x.right,merged_nearest_row_qrcodes))}')
-        print(f'missing_qrcode.left={list(map(lambda x: x.left,merged_nearest_row_qrcodes))}')
-        
-        #print(f'missing_qrcode.width,missing_qrcode.height={merged_nearest_row_qrcodes.width} and {merged_nearest_row_qrcodes.height}')
-        
+            
         # reload full image
         full_img=Image.open(img_name)
         
         # export symbol to font directory
         for i in range(0,len(merged_nearest_row_qrcodes)):
             self.get_symbol(full_img,merged_nearest_row_qrcodes[i].index,merged_nearest_row_qrcodes[i].top,merged_nearest_row_qrcodes[i].left,merged_nearest_row_qrcodes[i].bottom,merged_nearest_row_qrcodes[i].right,merged_nearest_row_qrcodes[i].width,merged_nearest_row_qrcodes[i].height)
-
     
     
     # returns the left position of the missing qr code
@@ -919,15 +899,10 @@ class ReadTemplate:
         nr_of_qrcodes_inbetween = abs(nearest_qrcode.column-column_missing_qrcode)-1
         missing_is_left_of_nearest = (nearest_qrcode.column>column_missing_qrcode)
         if missing_is_left_of_nearest:
-            print(f'nearest_qrcode.column={nearest_qrcode.column} and LEFT of that = {nearest_qrcode.left} and right of that = {nearest_qrcode.right}')
-            print(f'nr_of_qrcodes_inbetween={nr_of_qrcodes_inbetween}')
-            print(f'avg_qrcode_width={avg_qrcode_width}')
-            print(f'avg_qrcode_spacing={avg_qrcode_spacing}')
-            left = nearest_qrcode.left-((nr_of_qrcodes_inbetween+1)*avg_qrcode_width+(nr_of_qrcodes_inbetween+1+1)*avg_qrcode_spacing) # +1 cause the symbol itself and spacing  must also be crossed to arrive at the symbol left
-        else:
-            
+            # +1 cause the symbol itself and spacing  must also be crossed to arrive at the symbol left
+            left = nearest_qrcode.left-((nr_of_qrcodes_inbetween+1)*avg_qrcode_width+(nr_of_qrcodes_inbetween+1+1)*avg_qrcode_spacing) 
+        else:    
             left = nearest_qrcode.right+(nr_of_qrcodes_inbetween*avg_qrcode_width+(nr_of_qrcodes_inbetween+1)*avg_qrcode_spacing)
-        print(f'LEFT={left}\n\n\n')
         
         return left
         
@@ -936,11 +911,9 @@ class ReadTemplate:
     
     # returns the closest qr code
     def find_nearest_found_qrcode(self,missing_qrcode_in_row,found_qrcodes_in_row):
-        print(f'missing_qrcode_in_row={missing_qrcode_in_row.index}')
+        
         closest_right_qrcode = self.find_closest_right(missing_qrcode_in_row,found_qrcodes_in_row)
         closest_left_qrcode = self.find_closest_left(missing_qrcode_in_row,found_qrcodes_in_row)
-        #print(f'closest_right_qrcode={closest_right_qrcode.index}')
-        #print(f'closest_left_qrcode={closest_left_qrcode.index}')
         if not closest_right_qrcode is None:
             distance_right = abs(missing_qrcode_in_row.column-closest_right_qrcode.column)
         else:
@@ -959,7 +932,7 @@ class ReadTemplate:
         closest_right_column = 10000000
         closest_right_qr = None
         for i in range(0,len(found_qrcodes_in_row)):
-            print(f'found_qrcodes_in_row[i].column={found_qrcodes_in_row[i].column} and missing_qrcode_in_row.column={missing_qrcode_in_row.column}')
+            
             if found_qrcodes_in_row[i].column>missing_qrcode_in_row.column:
                 if closest_right_column>found_qrcodes_in_row[i].column:
                     closest_right_column=found_qrcodes_in_row[i].column
