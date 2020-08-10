@@ -3,5 +3,5 @@ boxWidth = 20
 boxHeight = 20
 nrOfBoxesPerLine = 9
 nrOfBoxesPerLineMinOne = 8
-nrOfLinesPerPage = 7
-nrOfLinesPerPageMinOne = 6
+nrOfLinesPerPage = 3
+nrOfLinesPerPageMinOne = 1

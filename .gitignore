@@ -10,3 +10,4 @@
 /template_reading/in/*
 /template_reading/out/*
 /template_reading/font/*
+/template_reading/__pycache__/*
