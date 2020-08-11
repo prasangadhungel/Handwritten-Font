@@ -538,7 +538,7 @@ class ReadTemplate:
         # loop through rows
         if row_nr == None:
             start_row = 1
-            end_row = self.nrOfLinesInTemplate
+            end_row = qrcodes[0].nrOfLinesInPage
         else:
             start_row = row_nr
             end_row = start_row+1
@@ -644,7 +644,7 @@ class ReadTemplate:
         
     # extracts the remaining symbols that aren't found by combining the assumed geometry data (layout) with the measured geometry data(measurements)
     def geometric_inference(self,img_name,qrcodes):    
-        for row_nr in range(1,self.nrOfLinesInTemplate+1):
+        for row_nr in range(1,qrcodes[0].nrOfLinesInPage+1):
             missing_qrcodes_indices_in_row = self.identify_unknown_qrcodes_in_row(row_nr,qrcodes)
             if len(missing_qrcodes_indices_in_row)>0:
                 page_nr_of_img = qrcodes[0].page_nr
@@ -671,7 +671,7 @@ class ReadTemplate:
     
     def get_nearest_row_with_spacing(self,page_nr_of_img,qrcodes,row_nr):
         start_row = 1
-        end_row = self.nrOfLinesInTemplate
+        end_row = qrcodes[0].nrOfLinesInPage
         for distance in range(start_row,end_row):
             for x in [-1,1]:
                 next_row_nr = row_nr+distance*x
@@ -749,7 +749,6 @@ class ReadTemplate:
         original_row_qr_codes =  self.get_found_qrcodes_in_row(original_row,qrcodes)
         if len(original_row_qr_codes)==0:
             reference_row = self.get_reference_row(nearest_row,qrcodes)
-            
             updated_geometry_data[3],updated_geometry_data[4] = self.get_interpolate_top_and_bottom(original_row,nearest_row,reference_row,qrcodes)
         else:
             updated_geometry_data[3] = round(mean(list(map(lambda x: x.top,original_row_qr_codes))),0) #3
@@ -765,7 +764,7 @@ class ReadTemplate:
     def get_interpolate_top_and_bottom(self,original_row,nearest_row,reference_row,qrcodes):
         # verify input data is valid for interpolation
         self.check_interpolation_options(original_row,nearest_row,reference_row)
-        
+        print(f'original_row={original_row},nearest_row={nearest_row},reference_row={reference_row}')
         # get the qrcodes of the nearest and reference rows 
         qrcodes_nearest_row = self.get_found_qrcodes_in_row(nearest_row,qrcodes)
         qrcodes_reference_row = self.get_found_qrcodes_in_row(reference_row,qrcodes)
@@ -803,7 +802,7 @@ class ReadTemplate:
 
     def get_reference_row(self,nearest_row,qrcodes):
         start_row = 1
-        end_row = self.nrOfLinesInTemplate
+        end_row = qrcodes[0].nrOfLinesInPage
         
         max_distance = 0
         max_distance_row = None

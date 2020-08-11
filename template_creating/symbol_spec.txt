@@ -1,8 +1,8 @@
-nrOfSymbols = 83
+nrOfSymbols = 63
 boxWidth = 19
 boxHeight = 19
 nrOfBoxesPerLine = 9
 nrOfBoxesPerLineMinOne = 8
-nrOfLinesInTemplate = 9
-nrOfLinesInTemplateMinOne = 8
+nrOfLinesInTemplate = 7
+nrOfLinesInTemplateMinOne = 6
 maxNrOfLinesPerPage = 4

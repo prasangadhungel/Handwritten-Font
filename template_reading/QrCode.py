@@ -34,8 +34,11 @@ class QrCode:
     # Returns the number of lines in the page on which the qrcode is positioned
     def get_nr_of_lines_in_page(self):
         nr_of_lines_in_page = self.maxNrOfLinesPerPage
+        
         if self.is_last_page():
+            print(f'self.get_nr_of_lines_in_last_page()={self.get_nr_of_lines_in_last_page()}')
             return self.get_nr_of_lines_in_last_page()
+        print(f'returning self.maxNrOfLinesPerPage={self.maxNrOfLinesPerPage}')
         return self.maxNrOfLinesPerPage
 
     # Returns true if qrcode is on last page.
