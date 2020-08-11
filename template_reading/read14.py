@@ -129,24 +129,24 @@ class ReadTemplate:
         # Load the (processed) image(s) from the input folder self.input_dir
         self.image, self.original,self.thresh = self.load_image(img_name)
          
+        # TODO: Uncomment to enable this run again
         # decode entire page at once if no_cnts_filter
-        if (no_cnts_filter):
-            print(f'img_name={img_name}')
-            merged_qrcodes = self.decode_complete_page(img_name)
-            self.do_geometric_inferencing(img_name,merged_qrcodes)
+        # if (no_cnts_filter):
+            # print(f'img_name={img_name}')
+            # merged_qrcodes = self.decode_complete_page(img_name)
+            # self.do_geometric_inferencing(img_name,merged_qrcodes)   
+        #else: # first select ROIs then find qr codes in those ROIs only
             
-            
-        else: # first select ROIs then find qr codes in those ROIs only
-            # Apply morphing to image, don't know why necessary but it works
-            self.close,self.kernel = self.morph_image() 
-            # Finds the contours which the code thinks contain qr codes
-            self.cnts = self.find_contours()
-            # Returns the regions of interest that actually contain qr codes
-            # ROI consists of 3 stacked blocks, on top the printed symbol, middle =written symbol,
-            # bottom is qr code
-            self.ROIs,self.ROIs_pos= self.loop_through_contours(all_cnts,no_cnts_filter)
-            # read the qr codes from the ROIs and export the found handwritten symbols
-            self.read_qr_imgs(img_name)
+        # Apply morphing to image, don't know why necessary but it works
+        self.close,self.kernel = self.morph_image() 
+        # Finds the contours which the code thinks contain qr codes
+        self.cnts = self.find_contours()
+        # Returns the regions of interest that actually contain qr codes
+        # ROI consists of 3 stacked blocks, on top the printed symbol, middle =written symbol,
+        # bottom is qr code
+        self.ROIs,self.ROIs_pos= self.loop_through_contours(all_cnts,no_cnts_filter)
+        # read the qr codes from the ROIs and export the found handwritten symbols
+        self.read_qr_imgs(img_name)
     
     # performs geometric inferencing to get all missing symbols from a page if enough qrcodes are found
     def do_geometric_inferencing(self,img_name,merged_qrcodes):
@@ -706,7 +706,7 @@ class ReadTemplate:
     # returns the qr codes in a specific row, from a set of qr codes in a single page
     def get_found_qrcodes_in_row(self,row_nr,qrcodes):
         found_qrcodes_index = self.get_qrcode_indices_in_row(row_nr,qrcodes)
-        print(f'found_qrcodes_index={found_qrcodes_index},with qrcodes={list(map(lambda x: x.index,qrcodes))}\n')
+        print(f'in row_nr={row_nr}  found_qrcodes_index={found_qrcodes_index},with qrcodes={list(map(lambda x: x.index,qrcodes))}\n')
         found_qrcodes = []
         for i in range(0,len(found_qrcodes_index)):
             for j in range(0,len(qrcodes)):
@@ -911,7 +911,7 @@ class ReadTemplate:
     
     # returns the closest qr code
     def find_nearest_found_qrcode(self,missing_qrcode_in_row,found_qrcodes_in_row):
-        
+        print(f'missing_qrcode_in_row={missing_qrcode_in_row} and found_qrcodes_in_row={found_qrcodes_in_row}')
         closest_right_qrcode = self.find_closest_right(missing_qrcode_in_row,found_qrcodes_in_row)
         closest_left_qrcode = self.find_closest_left(missing_qrcode_in_row,found_qrcodes_in_row)
         if not closest_right_qrcode is None:
