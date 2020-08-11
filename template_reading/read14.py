@@ -125,31 +125,31 @@ class ReadTemplate:
         
     # performs a run on an image based on run configuration settings    
     def perform_sym_extraction_run(self,img_name,all_cnts,no_cnts_filter):
-        
+        print(f'img_name={img_name}')
         ## execute file reading steps
         # Load the (processed) image(s) from the input folder self.input_dir
         self.image, self.original,self.thresh = self.load_image(img_name)
          
         # TODO: Uncomment to enable this run again
         # decode entire page at once if no_cnts_filter
-        # if (no_cnts_filter):
-            # print(f'img_name={img_name}')
-            # merged_qrcodes = self.decode_complete_page(img_name)
-            # self.do_geometric_inferencing(img_name,merged_qrcodes)   
-        #else: # first select ROIs then find qr codes in those ROIs only
+        if (no_cnts_filter):
+            print(f'img_name={img_name}')
+            merged_qrcodes = self.decode_complete_page(img_name)
+            self.do_geometric_inferencing(img_name,merged_qrcodes)   
+        else: # first select ROIs then find qr codes in those ROIs only
             
-        # Apply morphing to image, don't know why necessary but it works
-        self.close,self.kernel = self.morph_image() 
-        
-        # Finds the contours which the code thinks contain qr codes
-        self.cnts = self.find_contours()
-        
-        # Returns the regions of interest that actually contain qr codes
-        # ROI consists of 3 stacked blocks, on top the printed symbol, middle =written symbol,
-        # bottom is qr code
-        self.ROIs,self.ROIs_pos= self.loop_through_contours(all_cnts,no_cnts_filter)
-        # read the qr codes from the ROIs and export the found handwritten symbols
-        self.read_qr_imgs(img_name)
+            # Apply morphing to image, don't know why necessary but it works
+            self.close,self.kernel = self.morph_image() 
+            
+            # Finds the contours which the code thinks contain qr codes
+            self.cnts = self.find_contours()
+            
+            # Returns the regions of interest that actually contain qr codes
+            # ROI consists of 3 stacked blocks, on top the printed symbol, middle =written symbol,
+            # bottom is qr code
+            self.ROIs,self.ROIs_pos= self.loop_through_contours(all_cnts,no_cnts_filter)
+            # read the qr codes from the ROIs and export the found handwritten symbols
+            self.read_qr_imgs(img_name)
     
     # performs geometric inferencing to get all missing symbols from a page if enough qrcodes are found
     def do_geometric_inferencing(self,img_name,merged_qrcodes):
