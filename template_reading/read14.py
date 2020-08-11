@@ -53,8 +53,9 @@ class ReadTemplate:
         self.boxHeight = None
         self.nrOfBoxesPerLine = None
         self.nrOfBoxesPerLineMinOne = None
-        self.nrOfLinesPerPage = None
-        self.nrOfLinesPerPageMinOne = None
+        self.nrOfLinesInTemplate = None
+        self.nrOfLinesInTemplateMinOne = None
+        self.maxNrOfLinesPerPage = None
         
         ## hardcode script parameters
         # relative qr specification file location
@@ -139,8 +140,10 @@ class ReadTemplate:
             
         # Apply morphing to image, don't know why necessary but it works
         self.close,self.kernel = self.morph_image() 
+        
         # Finds the contours which the code thinks contain qr codes
         self.cnts = self.find_contours()
+        
         # Returns the regions of interest that actually contain qr codes
         # ROI consists of 3 stacked blocks, on top the printed symbol, middle =written symbol,
         # bottom is qr code
@@ -191,7 +194,6 @@ class ReadTemplate:
             missing_sym_indices = self.list_missing_symbols()
             found_missing = self.list_contains_string(self.list_missing_symbols(), int(qr_content))
             if found_missing:
-                print(f'FOUND MISSING={qr_content}')
                 
                 # compute coordinates of qr code
                 left_qr,top_qr,width_qr,height_qr = self.get_qr_coord(qrcode[i])
@@ -204,7 +206,7 @@ class ReadTemplate:
                 # export symbol to font directory
                 self.get_symbol(full_img,qr_content,top_qr,left_qr,bottom_qr,right_qr,width_qr,height_qr)
                 
-                custom_qrcode_object = QrCode(qr_content, top_qr,left_qr,width_qr,height_qr,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesPerPage)
+                custom_qrcode_object = QrCode(qr_content, top_qr,left_qr,width_qr,height_qr,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesInTemplate,self.maxNrOfLinesPerPage)
                 custom_qrcode_objects.append(custom_qrcode_object)
                 
         return custom_qrcode_objects
@@ -320,8 +322,9 @@ class ReadTemplate:
         self.boxHeight = self.rhs_val_of_eq(Lines[2])
         self.nrOfBoxesPerLine = int(self.rhs_val_of_eq(Lines[3]))
         self.nrOfBoxesPerLineMinOne = self.rhs_val_of_eq(Lines[4])
-        self.nrOfLinesPerPage = int(self.rhs_val_of_eq(Lines[5]))
-        self.nrOfLinesPerPageMinOne = self.rhs_val_of_eq(Lines[6])
+        self.nrOfLinesInTemplate = int(self.rhs_val_of_eq(Lines[5]))
+        self.nrOfLinesInTemplateMinOne = self.rhs_val_of_eq(Lines[6])
+        self.maxNrOfLinesPerPage = int(self.rhs_val_of_eq(Lines[7]))
     
     # returns the integer value of the number on the rhs of the equation in the line
     def rhs_val_of_eq(self, line):
@@ -349,7 +352,6 @@ class ReadTemplate:
             contour = self.ROIs[i]
             img = cv2.imread(f'{self.output_dir}/ROI_{i}.png')
             qrcode = self.preprocess_qrcode(img)
-            print(f'nr of qr codes in ROI {i} is: {len(qrcode)}')
             
              # get the contour positions wrt the original image
             left_ct = self.ROIs_pos[i][0]
@@ -382,12 +384,10 @@ class ReadTemplate:
                     
                     
                     # create an actual qrcode object
-                    qrcodes.append(QrCode(qr_content,top_qr,left_qr,width_qr_cont,height_qr_cont,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesPerPage))
+                    qrcodes.append(QrCode(qr_content,top_qr,left_qr,width_qr_cont,height_qr_cont,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesInTemplate,self.maxNrOfLinesPerPage))
                     
                     self.get_symbol(full_img,qr_content,top_qr,left_qr,bottom_qr,right_qr,width_qr_cont,height_qr_cont,i)
-        print(f'COMPLETED ANALYSIS BASED ON CONTOURS with len(qrcodes)={len(qrcodes)}')
         self.do_geometric_inferencing(img_name,qrcodes)
-        exit()
         
     def get_qr_coord(self,single_qrcode):
     # Get the qr coordinates relative to the contour:
@@ -509,14 +509,13 @@ class ReadTemplate:
                 return True
         return False
         
-    def geometric_inference(self,qrcodes):
-        qr = QrCode(11,1,2,3,4,100,9)
-        pass
         
+    # assumes at least 1 qr code is found
     # returns true if each row has contains a qr code that is found. Rows and columns start at 1
     def isQrcodeOnEachRow(self,qrcodes):
         # create a checklist with element for each row
-        checklist = [False] * self.nrOfLinesPerPage
+        checklist = [False] * qrcodes[0].nrOfLinesInCurrentPage
+        
         # loop through rows (rows start at 1)
         for i in range(1,len(checklist)+1):
             # loop through qr codes till a qr is found on the row under evaluation
@@ -527,17 +526,19 @@ class ReadTemplate:
                     checklist[i-1]=True #(rows start at 1 but lists don't so -1)
                     # skip the remainder of the qr codes since requirement is satisfied
                     j = len(checklist)+1 
+        
         # check if all rows contain a qr code.
         if all(element for element in checklist):
             return True
         # Return false if not every row has a qr code
         return False
     
-    def has_quarter_spacing(self,page_nr,qrcodes,row_nr=None):
+    def has_quarter_spacing(self,qrcodes,row_nr=None):
+        page_nr = qrcodes[0].get_page_nr()
         # loop through rows
         if row_nr == None:
             start_row = 1
-            end_row = self.nrOfLinesPerPage
+            end_row = self.nrOfLinesInTemplate
         else:
             start_row = row_nr
             end_row = start_row+1
@@ -609,7 +610,7 @@ class ReadTemplate:
             # compute found qr code symbol indices based on detected
             found_qrcode_index = list(map(lambda x: x.index,detected_qrcodes))
             # compute found qr code page position index based on detected (as though on page 1)
-            found_qrcode_index_on_page = list(map(lambda x: x.index-(x.page_nr-1)*self.nrOfBoxesPerLine*self.nrOfLinesPerPage,detected_qrcodes))
+            found_qrcode_index_on_page = list(map(lambda x: x.index-(x.page_nr-1)*self.nrOfBoxesPerLine*self.maxNrOfLinesPerPage,detected_qrcodes))
             
             # compute amount subtracted to normalize as though it was page 1
             subtracted = found_qrcode_index[0]-found_qrcode_index_on_page[0]
@@ -643,13 +644,13 @@ class ReadTemplate:
         
     # extracts the remaining symbols that aren't found by combining the assumed geometry data (layout) with the measured geometry data(measurements)
     def geometric_inference(self,img_name,qrcodes):    
-        for row_nr in range(1,self.nrOfLinesPerPage+1):
+        for row_nr in range(1,self.nrOfLinesInTemplate+1):
             missing_qrcodes_indices_in_row = self.identify_unknown_qrcodes_in_row(row_nr,qrcodes)
             if len(missing_qrcodes_indices_in_row)>0:
                 page_nr_of_img = qrcodes[0].page_nr
                 # TODO: Check if all qr codes have same page_nr, if not, throw exception
-                if self.has_quarter_spacing(page_nr_of_img,qrcodes):# if page has quarter spacing
-                    if self.has_quarter_spacing(page_nr_of_img,qrcodes,row_nr): # if row has quarter spacing
+                if self.has_quarter_spacing(qrcodes):# if page has quarter spacing
+                    if self.has_quarter_spacing(qrcodes,row_nr): # if row has quarter spacing
                         geometry_data = self.get_geometry_data(row_nr,page_nr_of_img,qrcodes)
                         self.extract_missing_symbols_in_line(img_name,row_nr,geometry_data,missing_qrcodes_indices_in_row,qrcodes)
                     else:
@@ -670,12 +671,12 @@ class ReadTemplate:
     
     def get_nearest_row_with_spacing(self,page_nr_of_img,qrcodes,row_nr):
         start_row = 1
-        end_row = self.nrOfLinesPerPage
+        end_row = self.nrOfLinesInTemplate
         for distance in range(start_row,end_row):
             for x in [-1,1]:
                 next_row_nr = row_nr+distance*x
                 if (next_row_nr  <= end_row) and (next_row_nr >= start_row):
-                    if self.has_quarter_spacing(page_nr_of_img,qrcodes,next_row_nr):
+                    if self.has_quarter_spacing(qrcodes,next_row_nr):
                         return next_row_nr
         # TODO: Throw exception that it could not perform complete geometric inference and need more/better data/images
                     
@@ -706,7 +707,6 @@ class ReadTemplate:
     # returns the qr codes in a specific row, from a set of qr codes in a single page
     def get_found_qrcodes_in_row(self,row_nr,qrcodes):
         found_qrcodes_index = self.get_qrcode_indices_in_row(row_nr,qrcodes)
-        print(f'in row_nr={row_nr}  found_qrcodes_index={found_qrcodes_index},with qrcodes={list(map(lambda x: x.index,qrcodes))}\n')
         found_qrcodes = []
         for i in range(0,len(found_qrcodes_index)):
             for j in range(0,len(qrcodes)):
@@ -719,11 +719,12 @@ class ReadTemplate:
         start_index = (row_nr-1)*(self.nrOfBoxesPerLine)+1
         end_index = (row_nr-1)*(self.nrOfBoxesPerLine)+self.nrOfBoxesPerLine
         all_indices_of_row = list(range(start_index,end_index+1))
+        
         # compute found qr code symbol indices based on detected
         found_qrcode_index = list(map(lambda x: x.index,detected_qrcodes))
         
         # compute found qr code page position index based on detected (as though on page 1)
-        found_qrcode_index_on_page = list(map(lambda x: x.index-(x.page_nr-1)*self.nrOfBoxesPerLine*self.nrOfLinesPerPage,detected_qrcodes))
+        found_qrcode_index_on_page = list(map(lambda x: x.index-(x.page_nr-1)*self.nrOfBoxesPerLine*self.maxNrOfLinesPerPage,detected_qrcodes))
         
         # compute amount subtracted to normalize as though it was page 1
         subtracted = found_qrcode_index[0]-found_qrcode_index_on_page[0]
@@ -733,10 +734,10 @@ class ReadTemplate:
         for i in range(0,len(found_qrcode_index_on_page)):
             if found_qrcode_index_on_page[i] in all_indices_of_row:
                 found_qr_codes_on_page.append(found_qrcode_index_on_page[i])        
-       
+        
         # compute absolute found indices of symbols of qr codes in a row that are found
         found_qr_codes_on_row = list(map(lambda x: x+subtracted,found_qr_codes_on_page))
-
+        
         return found_qr_codes_on_row
             
             
@@ -748,6 +749,7 @@ class ReadTemplate:
         original_row_qr_codes =  self.get_found_qrcodes_in_row(original_row,qrcodes)
         if len(original_row_qr_codes)==0:
             reference_row = self.get_reference_row(nearest_row,qrcodes)
+            
             updated_geometry_data[3],updated_geometry_data[4] = self.get_interpolate_top_and_bottom(original_row,nearest_row,reference_row,qrcodes)
         else:
             updated_geometry_data[3] = round(mean(list(map(lambda x: x.top,original_row_qr_codes))),0) #3
@@ -801,7 +803,7 @@ class ReadTemplate:
 
     def get_reference_row(self,nearest_row,qrcodes):
         start_row = 1
-        end_row = self.nrOfLinesPerPage
+        end_row = self.nrOfLinesInTemplate
         
         max_distance = 0
         max_distance_row = None
@@ -831,14 +833,14 @@ class ReadTemplate:
         found_qrcodes_in_row = geometry_data[0]
         missing_qrcodes = []
         for i in range(0,len(missing_qrcodes_indices_in_row)):
-            missing_qrcode_filler = QrCode(missing_qrcodes_indices_in_row[i],1,2,3,4,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesPerPage)
+            missing_qrcode_filler = QrCode(missing_qrcodes_indices_in_row[i],1,2,3,4,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesInTemplate,self.maxNrOfLinesPerPage)
             nearest_qrcode, nr_of_qrcodes_inbetween = self.find_nearest_found_qrcode(missing_qrcode_filler,found_qrcodes_in_row)
             missing_qrcode_filler.top = geometry_data[3]
             missing_qrcode_filler.bottom = geometry_data[4]
             missing_qrcode_filler.width = geometry_data[1]
             missing_qrcode_filler.height = geometry_data[2]
             missing_qrcode_filler.left = self.get_left_pos_of_missing_qrcode(missing_qrcode_filler.column,nearest_qrcode,geometry_data)
-            missing_qrcode = QrCode(missing_qrcodes_indices_in_row[i],missing_qrcode_filler.top,missing_qrcode_filler.left,missing_qrcode_filler.width,missing_qrcode_filler.height,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesPerPage)
+            missing_qrcode = QrCode(missing_qrcodes_indices_in_row[i],missing_qrcode_filler.top,missing_qrcode_filler.left,missing_qrcode_filler.width,missing_qrcode_filler.height,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesInTemplate,self.maxNrOfLinesPerPage)
             missing_qrcodes.append(missing_qrcode)
             
             # reload full image
@@ -853,7 +855,7 @@ class ReadTemplate:
         missing_qrcodes = []
         for i in range(0,len(missing_qrcodes_indices_in_row)):
             # create filler for empty row
-            missing_qrcode_filler = QrCode(missing_qrcodes_indices_in_row[i],1,2,3,4,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesPerPage)
+            missing_qrcode_filler = QrCode(missing_qrcodes_indices_in_row[i],1,2,3,4,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesInTemplate,self.maxNrOfLinesPerPage)
             
             #get the missing qr codes of the nearest row
             nearest_qrcode, nr_of_qrcodes_inbetween = self.find_nearest_found_qrcode(missing_qrcode_filler,qrcodes_of_nearest_row)
@@ -865,7 +867,7 @@ class ReadTemplate:
             ## compute the left of all missing qr codes
             missing_qrcode_filler.left = self.get_left_pos_of_missing_qrcode(missing_qrcode_filler.column,nearest_qrcode,geometry_data)
             
-            missing_qrcode = QrCode(missing_qrcodes_indices_in_row[i],missing_qrcode_filler.top,missing_qrcode_filler.left,missing_qrcode_filler.width,missing_qrcode_filler.height,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesPerPage)
+            missing_qrcode = QrCode(missing_qrcodes_indices_in_row[i],missing_qrcode_filler.top,missing_qrcode_filler.left,missing_qrcode_filler.width,missing_qrcode_filler.height,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesInTemplate,self.maxNrOfLinesPerPage)
             missing_qrcodes.append(missing_qrcode)
             
             ## overide the top and bottom settings of the concatenated list using updated_geometry_data
@@ -911,11 +913,12 @@ class ReadTemplate:
     
     # returns the closest qr code
     def find_nearest_found_qrcode(self,missing_qrcode_in_row,found_qrcodes_in_row):
-        print(f'missing_qrcode_in_row={missing_qrcode_in_row} and found_qrcodes_in_row={found_qrcodes_in_row}')
         closest_right_qrcode = self.find_closest_right(missing_qrcode_in_row,found_qrcodes_in_row)
         closest_left_qrcode = self.find_closest_left(missing_qrcode_in_row,found_qrcodes_in_row)
+        
         if not closest_right_qrcode is None:
             distance_right = abs(missing_qrcode_in_row.column-closest_right_qrcode.column)
+            return closest_right_qrcode,distance_right
         else:
             distance_left = abs(missing_qrcode_in_row.column-closest_left_qrcode.column)
             return closest_left_qrcode,distance_left
