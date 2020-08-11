@@ -1,6 +1,6 @@
 nrOfSymbols = 83
-boxWidth = 20
-boxHeight = 20
+boxWidth = 19
+boxHeight = 19
 nrOfBoxesPerLine = 9
 nrOfBoxesPerLineMinOne = 8
 nrOfLinesInTemplate = 9

@@ -1,0 +1,6 @@
+Symbols that have a special meaning in latex need some solution to prevent latex from reading it as a command instead of verbatim text.
+_
+$
+#
+|
+\

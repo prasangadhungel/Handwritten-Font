@@ -19,13 +19,13 @@ class CreateTemplate:
         self.max_sheet_width = 210 # mm
         self.max_horizontal_margin = 5 # mm (2.5 on each side)
         self.max_sheet_height = 297 # mm
-        self.box_width = 20 #mm
+        self.box_width = 19 #mm
         self.box_spacing = 3 #mm
         
         # specify qr code line margins
         self.sheet_top_margin = 6 #measured in mm
         print(f'self.sheet_top_margin={self.sheet_top_margin}')
-        self.sheet_bottom_margin = self.sheet_top_margin # assumption
+        self.sheet_bottom_margin = self.max_sheet_height*(844-768)/844 # measured in pixels based on showgeometry package lines
         self.spacing_between_two_lines = self.max_sheet_height*(64/2338) #measured in pixels for box width 20 mm
         
         
