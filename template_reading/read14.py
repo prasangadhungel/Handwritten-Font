@@ -129,26 +129,30 @@ class ReadTemplate:
         # Load the (processed) image(s) from the input folder self.input_dir
         self.image, self.original,self.thresh = self.load_image(img_name)
          
+        # TODO: Uncomment to enable this run again
         # decode entire page at once if no_cnts_filter
-        if (no_cnts_filter):
-            print(f'img_name={img_name}')
-            merged_qrcodes = self.decode_complete_page(img_name)
+        # if (no_cnts_filter):
+            # print(f'img_name={img_name}')
+            # merged_qrcodes = self.decode_complete_page(img_name)
+            # self.do_geometric_inferencing(img_name,merged_qrcodes)   
+        #else: # first select ROIs then find qr codes in those ROIs only
             
-            if len(merged_qrcodes)>0:
+        # Apply morphing to image, don't know why necessary but it works
+        self.close,self.kernel = self.morph_image() 
+        # Finds the contours which the code thinks contain qr codes
+        self.cnts = self.find_contours()
+        # Returns the regions of interest that actually contain qr codes
+        # ROI consists of 3 stacked blocks, on top the printed symbol, middle =written symbol,
+        # bottom is qr code
+        self.ROIs,self.ROIs_pos= self.loop_through_contours(all_cnts,no_cnts_filter)
+        # read the qr codes from the ROIs and export the found handwritten symbols
+        self.read_qr_imgs(img_name)
+    
+    # performs geometric inferencing to get all missing symbols from a page if enough qrcodes are found
+    def do_geometric_inferencing(self,img_name,merged_qrcodes):
+        if len(merged_qrcodes)>0:
                 # perform geometric inference
-                self.geometric_inference(img_name,merged_qrcodes) 
-            
-        else: # first select ROIs then find qr codes in those ROIs only
-            # Apply morphing to image, don't know why necessary but it works
-            self.close,self.kernel = self.morph_image() 
-            # Finds the contours which the code thinks contain qr codes
-            self.cnts = self.find_contours()
-            # Returns the regions of interest that actually contain qr codes
-            # ROI consists of 3 stacked blocks, on top the printed symbol, middle =written symbol,
-            # bottom is qr code
-            self.ROIs,self.ROIs_pos= self.loop_through_contours(all_cnts,no_cnts_filter)
-            # read the qr codes from the ROIs and export the found handwritten symbols
-            self.read_qr_imgs(img_name)
+                self.geometric_inference(img_name,merged_qrcodes)     
         
     # decodes complete page at once for both original and thresholded image
     def decode_complete_page(self,img_name):
@@ -163,7 +167,7 @@ class ReadTemplate:
         # return merged qrcodes with dupes removed
         #return list(set(qrcode_original+qrcode_thresholded)) 
         merged_list = qrcode_original+qrcode_thresholded
-        print(f'merged_list={merged_list}')
+        
         seen = []
         unique_list =[]
         for obj in merged_list:
@@ -171,7 +175,6 @@ class ReadTemplate:
                 seen.append(obj.hashcode)
                 unique_list.append(obj)
             
-        print(f'unique_list={unique_list}')
         return unique_list
         
         
@@ -335,7 +338,7 @@ class ReadTemplate:
     
     # reads the qr codes, finds written symbol and exports symbol as picture with the id contained in the qr code.
     def read_qr_imgs(self,img_name):
-    
+        qrcodes = []
         # reload full image
         full_img=Image.open(img_name)
     
@@ -376,7 +379,15 @@ class ReadTemplate:
                     left_qr = left_ct+left_qr_cont
                     bottom_qr =top_ct+top_qr_cont+height_qr_cont
                     right_qr = left_ct+ left_qr_cont+width_qr_cont
+                    
+                    
+                    # create an actual qrcode object
+                    qrcodes.append(QrCode(qr_content,top_qr,left_qr,width_qr_cont,height_qr_cont,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesPerPage))
+                    
                     self.get_symbol(full_img,qr_content,top_qr,left_qr,bottom_qr,right_qr,width_qr_cont,height_qr_cont,i)
+        print(f'COMPLETED ANALYSIS BASED ON CONTOURS with len(qrcodes)={len(qrcodes)}')
+        self.do_geometric_inferencing(img_name,qrcodes)
+        exit()
         
     def get_qr_coord(self,single_qrcode):
     # Get the qr coordinates relative to the contour:
@@ -576,8 +587,6 @@ class ReadTemplate:
     # returns true if the distance between the codes on a line is larger than the given fraction of the nr of boxes of that line
     def check_hori_dist(self,left,right,fraction):
         if (not left==None) and (not right==None):
-            # print(f'found={(right-left-1)/self.nrOfBoxesPerLine}')
-            # print(f'margin={fraction}')
             if (right-left-1)/self.nrOfBoxesPerLine>=fraction:
                 return True
         return False
@@ -590,7 +599,6 @@ class ReadTemplate:
  
     # returns list of indices of qr codes that are not detected in specific row
     def identify_unknown_qrcodes_in_row(self,row_nr,detected_qrcodes):
-        print(f'row_nr={row_nr} and self.nrOfBoxesPerLine={self.nrOfBoxesPerLine}')
         start_index = (row_nr-1) * int(self.nrOfBoxesPerLine) + 1
         end_index = (row_nr-1)*(int(self.nrOfBoxesPerLine))+int(self.nrOfBoxesPerLine)
         missing_in_row = list(range(start_index,end_index+1))
@@ -600,21 +608,17 @@ class ReadTemplate:
             
             # compute found qr code symbol indices based on detected
             found_qrcode_index = list(map(lambda x: x.index,detected_qrcodes))
-            print(f'found_qrcode_index={found_qrcode_index}')
             # compute found qr code page position index based on detected (as though on page 1)
             found_qrcode_index_on_page = list(map(lambda x: x.index-(x.page_nr-1)*self.nrOfBoxesPerLine*self.nrOfLinesPerPage,detected_qrcodes))
             
             # compute amount subtracted to normalize as though it was page 1
             subtracted = found_qrcode_index[0]-found_qrcode_index_on_page[0]
-            print(f'found_qrcode_index_on_page={found_qrcode_index_on_page}')
             
             # compute which indices would be missing if as though it was on page 1
             missing_qrcode_index_on_page = self.remove_list_elements(missing_in_row,found_qrcode_index_on_page)
-            print(f'missing_qrcode_index_on_page={missing_qrcode_index_on_page}')
             
             # compute absolute missing indices of symbols of qr codes that are not detected
             missing_qrcode_index = list(map(lambda x: x+subtracted,missing_qrcode_index_on_page))
-            print(f'missing_qrcode_index={missing_qrcode_index}\n\n')
             return missing_qrcode_index
         
     def remove_list_elements(self,original,sublist):
@@ -650,29 +654,19 @@ class ReadTemplate:
                         self.extract_missing_symbols_in_line(img_name,row_nr,geometry_data,missing_qrcodes_indices_in_row,qrcodes)
                     else:
                         nearest_row_with_spacing = self.get_nearest_row_with_spacing(page_nr_of_img,qrcodes,row_nr)
-                        print('NEED THE GEOMETRIC UPDATE FROM THE OTHER ROW AS A REFERENCE TO DO GEOMETRIC INFERENCE. That has not yet been implemented though.')
+                        
                         if not nearest_row_with_spacing is None:
                             geometry_data = self.get_geometry_data(nearest_row_with_spacing,page_nr_of_img,qrcodes)
-                            print(f'before geometry_data[3]=top={geometry_data[3]}, and geometry_data[4]=bottom={geometry_data[4]}')
                             
                             updated_geometry_data = self.update_geometry(geometry_data,row_nr,nearest_row_with_spacing,qrcodes)
-                            print(f'nearest_row_with_spacing={nearest_row_with_spacing}')
-                            
-                            print(f'after geometry_data[3]=top={geometry_data[3]}, and geometry_data[4]=bottom={geometry_data[4]}')
-                            print(f'updated_geometry_data[3]=top={updated_geometry_data[3]}, and updated_geometry_data[4]=bottom={updated_geometry_data[4]}')
-                            
                             
                             qrcodes_of_nearest_row = self.get_found_qrcodes_in_row(nearest_row_with_spacing,qrcodes)
-                            print(f'qrcodes_of_nearest_row={qrcodes_of_nearest_row}')
                             
                             missing_qr_codes_indices_in_nearest_row = self.identify_unknown_qrcodes_in_row(nearest_row_with_spacing,qrcodes)
                             
-                            # doubt qrcodes_of_nearest_row or found_qrcodes?
                             self.extract_missing_symbols_in_empty_line(img_name,row_nr,geometry_data,missing_qr_codes_indices_in_nearest_row,qrcodes,updated_geometry_data,qrcodes_of_nearest_row,nearest_row_with_spacing)
-                            
-                       #self.use_closest_row_with_distance_frac_for_extraction()
                 else:
-                    return print(f'NEED MORE IMAGES CANT DO GEOMETRIC INFERENCE.')
+                    return print(f'NEED MORE IMAGES CANT DO GEOMETRIC INFERENCE in this run TODO: Specify which run.')
     
     def get_nearest_row_with_spacing(self,page_nr_of_img,qrcodes,row_nr):
         start_row = 1
@@ -712,7 +706,7 @@ class ReadTemplate:
     # returns the qr codes in a specific row, from a set of qr codes in a single page
     def get_found_qrcodes_in_row(self,row_nr,qrcodes):
         found_qrcodes_index = self.get_qrcode_indices_in_row(row_nr,qrcodes)
-        print(f'found_qrcodes_index={found_qrcodes_index},with qrcodes={list(map(lambda x: x.index,qrcodes))}\n\n\n')
+        print(f'in row_nr={row_nr}  found_qrcodes_index={found_qrcodes_index},with qrcodes={list(map(lambda x: x.index,qrcodes))}\n')
         found_qrcodes = []
         for i in range(0,len(found_qrcodes_index)):
             for j in range(0,len(qrcodes)):
@@ -725,13 +719,12 @@ class ReadTemplate:
         start_index = (row_nr-1)*(self.nrOfBoxesPerLine)+1
         end_index = (row_nr-1)*(self.nrOfBoxesPerLine)+self.nrOfBoxesPerLine
         all_indices_of_row = list(range(start_index,end_index+1))
-        print(f'all_indices_of_row={all_indices_of_row}')
         # compute found qr code symbol indices based on detected
         found_qrcode_index = list(map(lambda x: x.index,detected_qrcodes))
         
         # compute found qr code page position index based on detected (as though on page 1)
         found_qrcode_index_on_page = list(map(lambda x: x.index-(x.page_nr-1)*self.nrOfBoxesPerLine*self.nrOfLinesPerPage,detected_qrcodes))
-        print(f'found_qrcode_index_on_page={found_qrcode_index_on_page}')
+        
         # compute amount subtracted to normalize as though it was page 1
         subtracted = found_qrcode_index[0]-found_qrcode_index_on_page[0]
         
@@ -752,14 +745,10 @@ class ReadTemplate:
     # (because that row didn't have the quarter distance fraction/enough geometry data)
     def update_geometry(self,geometry_data,original_row,nearest_row,qrcodes):
         updated_geometry_data = geometry_data.copy()
-        print(f'original_row={original_row} and qrcodes ={list(map(lambda x: x.index,qrcodes))}')
         original_row_qr_codes =  self.get_found_qrcodes_in_row(original_row,qrcodes)
         if len(original_row_qr_codes)==0:
             reference_row = self.get_reference_row(nearest_row,qrcodes)
-            
             updated_geometry_data[3],updated_geometry_data[4] = self.get_interpolate_top_and_bottom(original_row,nearest_row,reference_row,qrcodes)
-            print(f'updated_geometry_data[3]=top={updated_geometry_data[3]}, and updated_geometry_data[4]=bottom={updated_geometry_data[4]}')
-            print(f'reference_row={reference_row} and original_row = {original_row}\n\n')
         else:
             updated_geometry_data[3] = round(mean(list(map(lambda x: x.top,original_row_qr_codes))),0) #3
             updated_geometry_data[4] = round(mean(list(map(lambda x: x.bottom,original_row_qr_codes))),0) #3
@@ -775,42 +764,21 @@ class ReadTemplate:
         # verify input data is valid for interpolation
         self.check_interpolation_options(original_row,nearest_row,reference_row)
         
-        # compute distance in qr codes between nearest and reference row
-        # nr_lines_between_ref_min_nearest = reference_row-nearest_row #2=3-1 #c-a _boxes
-        # nr_lines_between_ref_min_originial = reference_row-original_row #1=3-2  #c-b _boxes
-        # nr_lines_between_originial_min_nearest = original_row-nearest_row #b-a _boxes
-        
-        # print(f'nr_lines_between_ref_min_nearest={nr_lines_between_ref_min_nearest},  nearest_row={nearest_row}')
-        # print(f'nr_lines_between_ref_min_originial={nr_lines_between_ref_min_originial},  original_row={original_row}')
-        # print(f'nr_lines_between_originial_min_nearest={nr_lines_between_originial_min_nearest},  reference_row={reference_row}')
-        
-        
         # get the qrcodes of the nearest and reference rows 
         qrcodes_nearest_row = self.get_found_qrcodes_in_row(nearest_row,qrcodes)
         qrcodes_reference_row = self.get_found_qrcodes_in_row(reference_row,qrcodes)
         
-        print(f'nearest_row={nearest_row} and len(qrcodes_nearest_row)={len(qrcodes_nearest_row)}')
-        print(f'reference_row={reference_row} and len(qrcodes_nearest_row)={len(qrcodes_reference_row)}')
-        
         # compute the avg top position of the qr code of the nearest and reference rows
         top_nearest_row = round(mean(list(map(lambda x: x.top,qrcodes_nearest_row))),0) # a _pixels
         top_reference_row = round(mean(list(map(lambda x: x.top,qrcodes_reference_row))),0) # c_pixels
-        print(f'top_nearest_row={top_nearest_row}')
-        print(f'top_reference_row={top_reference_row}')
-        
         
         # compute the avg bottom position of the qr code of the nearest and reference rows
         bottom_nearest_row = round(mean(list(map(lambda x: x.bottom,qrcodes_nearest_row))),0) # a _pixels
         bottom_reference_row = round(mean(list(map(lambda x: x.bottom,qrcodes_reference_row))),0) # c_pixels
         
-        print(f'bottom_nearest_row={bottom_nearest_row}')
-        print(f'bottom_reference_row={bottom_reference_row}')
-        
-        
         # Compute the measured distance between the top of the nearest and reference row
         top_ref_min_nearest = top_nearest_row-top_reference_row #c-a _pixels
         bottom_ref_min_nearest = bottom_nearest_row-bottom_reference_row #c-a _pixels
-        print(f'top_ref_min_nearest={top_ref_min_nearest}')
         
         # Interpolate the difference between the top of the nearest row and original row (in pixels)
         # a is nearest row
@@ -819,8 +787,6 @@ class ReadTemplate:
         #a_pixels+(c-a)_pixels*(b-a)_boxes/(c-a)_boxes
         top_original = top_nearest_row+(top_reference_row-top_nearest_row)*(original_row-nearest_row)/(reference_row-nearest_row)
         bottom_original = bottom_nearest_row+(bottom_reference_row-bottom_nearest_row)*(original_row-nearest_row)/(reference_row-nearest_row)
-        print(f'top_original={top_original}')
-        print(f'bottom_original={bottom_original}')
         
         return top_original,bottom_original
         
@@ -836,7 +802,7 @@ class ReadTemplate:
     def get_reference_row(self,nearest_row,qrcodes):
         start_row = 1
         end_row = self.nrOfLinesPerPage
-        print(f'end_row={end_row}\n\n\n')
+        
         max_distance = 0
         max_distance_row = None
         for distance in range(start_row,end_row):
@@ -851,7 +817,7 @@ class ReadTemplate:
     # computes the geometry of qrcodes in a specific row on a specific page and returns it as list
     def get_geometry_data(self,row_nr,page_nr_of_img,qrcodes):
         qrcodes_in_row = self.get_found_qrcodes_in_row(row_nr,qrcodes) #0 
-        print(f'row_nr={row_nr},page_nr={page_nr_of_img},qrcodes_in_row={qrcodes_in_row}')
+        
         avg_width_in_row = round(mean(list(map(lambda x: x.width,qrcodes_in_row))),0) #1
         avg_height_in_row = round(mean(list(map(lambda x: x.height,qrcodes_in_row))),0) #2
         avg_top_in_row = round(mean(list(map(lambda x: x.top,qrcodes_in_row))),0) #3
@@ -889,7 +855,6 @@ class ReadTemplate:
             # create filler for empty row
             missing_qrcode_filler = QrCode(missing_qrcodes_indices_in_row[i],1,2,3,4,self.nrOfSymbols,self.nrOfBoxesPerLine,self.nrOfLinesPerPage)
             
-            print(f'missing_qrcodes_indices_in_row={missing_qrcodes_indices_in_row} and qrcodes_of_nearest_row ={qrcodes_of_nearest_row}')
             #get the missing qr codes of the nearest row
             nearest_qrcode, nr_of_qrcodes_inbetween = self.find_nearest_found_qrcode(missing_qrcode_filler,qrcodes_of_nearest_row)
             missing_qrcode_filler.top = geometry_data[3]
@@ -917,30 +882,14 @@ class ReadTemplate:
                 merged_nearest_row_qrcodes[i].bottom = missing_qrcode.bottom
                 
             # update the indices of the missing rows from nearest to original empty row indices
-            #print(f'original_row_nr={original_row_nr}')
-            #print(f'missing_qrcodes_indices_in_row={missing_qrcodes_indices_in_row}')
-            #merged_nearest_row_qrcodes[i].index= missing_qrcodes_indices_in_row
-            #print(f'nearest_row_with_spacing={nearest_row_with_spacing}')
             merged_nearest_row_qrcodes[i].index = merged_nearest_row_qrcodes[i].index+(original_row_nr-nearest_row_with_spacing)*self.nrOfBoxesPerLine
-            #missing_qrcodes_indices_in_row[i]
-            print(f'merged_nearest_row_qrcodes[i].index={merged_nearest_row_qrcodes[i].index} and i = {i}')
-        
-        
-        print(f'missing_qrcode.index={list(map(lambda x: x.index,merged_nearest_row_qrcodes))}')
-        print(f'missing_qrcode.top={list(map(lambda x: x.top,merged_nearest_row_qrcodes))}')
-        print(f'missing_qrcode.bottom={list(map(lambda x: x.bottom,merged_nearest_row_qrcodes))}')
-        print(f'missing_qrcode.right={list(map(lambda x: x.right,merged_nearest_row_qrcodes))}')
-        print(f'missing_qrcode.left={list(map(lambda x: x.left,merged_nearest_row_qrcodes))}')
-        
-        #print(f'missing_qrcode.width,missing_qrcode.height={merged_nearest_row_qrcodes.width} and {merged_nearest_row_qrcodes.height}')
-        
+            
         # reload full image
         full_img=Image.open(img_name)
         
         # export symbol to font directory
         for i in range(0,len(merged_nearest_row_qrcodes)):
             self.get_symbol(full_img,merged_nearest_row_qrcodes[i].index,merged_nearest_row_qrcodes[i].top,merged_nearest_row_qrcodes[i].left,merged_nearest_row_qrcodes[i].bottom,merged_nearest_row_qrcodes[i].right,merged_nearest_row_qrcodes[i].width,merged_nearest_row_qrcodes[i].height)
-
     
     
     # returns the left position of the missing qr code
@@ -950,15 +899,10 @@ class ReadTemplate:
         nr_of_qrcodes_inbetween = abs(nearest_qrcode.column-column_missing_qrcode)-1
         missing_is_left_of_nearest = (nearest_qrcode.column>column_missing_qrcode)
         if missing_is_left_of_nearest:
-            print(f'nearest_qrcode.column={nearest_qrcode.column} and LEFT of that = {nearest_qrcode.left} and right of that = {nearest_qrcode.right}')
-            print(f'nr_of_qrcodes_inbetween={nr_of_qrcodes_inbetween}')
-            print(f'avg_qrcode_width={avg_qrcode_width}')
-            print(f'avg_qrcode_spacing={avg_qrcode_spacing}')
-            left = nearest_qrcode.left-((nr_of_qrcodes_inbetween+1)*avg_qrcode_width+(nr_of_qrcodes_inbetween+1+1)*avg_qrcode_spacing) # +1 cause the symbol itself and spacing  must also be crossed to arrive at the symbol left
-        else:
-            
+            # +1 cause the symbol itself and spacing  must also be crossed to arrive at the symbol left
+            left = nearest_qrcode.left-((nr_of_qrcodes_inbetween+1)*avg_qrcode_width+(nr_of_qrcodes_inbetween+1+1)*avg_qrcode_spacing) 
+        else:    
             left = nearest_qrcode.right+(nr_of_qrcodes_inbetween*avg_qrcode_width+(nr_of_qrcodes_inbetween+1)*avg_qrcode_spacing)
-        print(f'LEFT={left}\n\n\n')
         
         return left
         
@@ -967,11 +911,9 @@ class ReadTemplate:
     
     # returns the closest qr code
     def find_nearest_found_qrcode(self,missing_qrcode_in_row,found_qrcodes_in_row):
-        print(f'missing_qrcode_in_row={missing_qrcode_in_row.index}')
+        print(f'missing_qrcode_in_row={missing_qrcode_in_row} and found_qrcodes_in_row={found_qrcodes_in_row}')
         closest_right_qrcode = self.find_closest_right(missing_qrcode_in_row,found_qrcodes_in_row)
         closest_left_qrcode = self.find_closest_left(missing_qrcode_in_row,found_qrcodes_in_row)
-        #print(f'closest_right_qrcode={closest_right_qrcode.index}')
-        #print(f'closest_left_qrcode={closest_left_qrcode.index}')
         if not closest_right_qrcode is None:
             distance_right = abs(missing_qrcode_in_row.column-closest_right_qrcode.column)
         else:
@@ -990,7 +932,7 @@ class ReadTemplate:
         closest_right_column = 10000000
         closest_right_qr = None
         for i in range(0,len(found_qrcodes_in_row)):
-            print(f'found_qrcodes_in_row[i].column={found_qrcodes_in_row[i].column} and missing_qrcode_in_row.column={missing_qrcode_in_row.column}')
+            
             if found_qrcodes_in_row[i].column>missing_qrcode_in_row.column:
                 if closest_right_column>found_qrcodes_in_row[i].column:
                     closest_right_column=found_qrcodes_in_row[i].column
