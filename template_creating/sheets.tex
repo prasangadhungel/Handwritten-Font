@@ -21,8 +21,8 @@
 %     \item \missingcommand{boxHeight}
 %     \item \missingcommand{nrOfBoxesPerLine}
 %     \item \missingcommand{nrOfBoxesPerLineMinOne}
-%     \item \missingcommand{nrOfLinesPerPage}
-%     \item \missingcommand{nrOfLinesPerPageMinOne}
+%     \item \missingcommand{nrOfLinesInTemplate}
+%     \item \missingcommand{nrOfLinesInTemplateMinOne}
 % \end{itemize}
 
 % read symbols
@@ -55,7 +55,8 @@
 \newcounter{ct1}
 \newcounter{ct2}
 \newcounter{ct3}
-\newcounter{ct4}
+\newcounter{ct4} % count the nrOfLinesInTemplate
+\newcounter{ct5} % count the nrOfLinesPerPage
 
 % set a symbol counter
 \newcounter{symIndex}
@@ -69,9 +70,12 @@
 %\newpage
 \hspace{-1.7em} % SHift top row left to prevent some section indentation
 
+\vspace{-3.5em}
 % loop through the nr of lines vertically
-\noindent\forloop{ct4}{0}{\value{ct4} < \missingcommand{nrOfLinesPerPage}}{
-
+\noindent\forloop{ct4}{0}{\value{ct4} < \missingcommand{nrOfLinesInTemplate}}{
+    
+    % increase the lines per page count by 1
+    \addtocounter{counterA}{1}
 
     \begin{tikzpicture}[scale=2][H]
         \tikzstyle{ann} = [draw=none,fill=none,right]
@@ -117,4 +121,10 @@
                 \node[draw=none,fill=none] {\qrcode[height=\missingcommand{boxWidth}mm]{\the\value{qrIndex}} };\\
             }; % close loop through horizontal boxes
     \end{tikzpicture}
+    
+    
+    \setcounter{counterB}{\missingcommand{maxNrOfLinesPerPage}}
+    \maccommand
+    
+    
 } % close loop through lines
