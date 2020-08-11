@@ -104,6 +104,7 @@ class ReadTemplate:
         
         # Perform run that finds all contours and scans qr codes in all of them
         if not self.found_all_symbols():
+            print(f'Performing final run that find and evaluates all contours regardless of aspect ratio, this run takes a while>5min.\n\n')
             self.loop_through_scanned_images(True,self.no_cnts_filter)
     
     # loops through all pages of a scanned template pdf
@@ -133,11 +134,11 @@ class ReadTemplate:
         # TODO: Uncomment to enable this run again
         # decode entire page at once if no_cnts_filter
         if (no_cnts_filter):
-            print(f'img_name={img_name}')
+            print(f'Running the fastest detection method that scans an entire page at once on file: img_name={img_name}.\n\n This method usually does not handle large images>20mb well, but does quickly evaluate small images. If it detects enough qr codes in the small image to perform geometric inference it extracts the remaining symbols you have written based on the geometric properties of the template.\n\n Otherwise it goes into a more detailed run to first detect contours that might contain a qr code and then look in that contour for a qr code if the contour has the right aspect ratio. The latter approach takes longer but usually finds more qr codes, which could just push it over the threshold for geometric inference to get all the symbols.\n\n If that does not find all qr codes/symbols, then the last run is repeated without filtering the contours on aspect ratio, sometimes this manages to squeeze out another one or two qr codes.\n\n')
             merged_qrcodes = self.decode_complete_page(img_name)
             self.do_geometric_inferencing(img_name,merged_qrcodes)   
         else: # first select ROIs then find qr codes in those ROIs only
-            
+            print(f'Started second run, selecting contours on aspect ratio.\n\n')
             # Apply morphing to image, don't know why necessary but it works
             self.close,self.kernel = self.morph_image() 
             
@@ -154,8 +155,9 @@ class ReadTemplate:
     # performs geometric inferencing to get all missing symbols from a page if enough qrcodes are found
     def do_geometric_inferencing(self,img_name,merged_qrcodes):
         if len(merged_qrcodes)>0:
-                # perform geometric inference
-                self.geometric_inference(img_name,merged_qrcodes)     
+            print(f'Starting geometric inference. It inter/extrapolates/guesses the position of the remaining/unfound handwritten symbols based on the geometric properties of the qr codes. It is configured to only function if at least 1 pair of qr codes in a single row have 2 other qr codes inbetween them. This is to ensure a minimum level of measurement accuracy. (But it does not account for nonlinear distortions.\n\n.')
+            # perform geometric inference
+            self.geometric_inference(img_name,merged_qrcodes)     
         
     # decodes complete page at once for both original and thresholded image
     def decode_complete_page(self,img_name):
